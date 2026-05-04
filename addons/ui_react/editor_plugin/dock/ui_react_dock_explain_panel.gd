@@ -1,0 +1,4697 @@
+## Editor dock tab: declarative dependency snapshot ([code]CB-018A[/code]) plus visual graph layout ([code]CB-018A.5[/code]) for the graph workbench.
+## The graph and embedded wire-rules list also perform authoring edits (rebind, disconnect, new link, scope presets, create state) via [UiReactActionController] and graph edit services—not a read-only viewer.
+class_name UiReactDockExplainPanel
+extends MarginContainer
+
+const _ExplainBuilderScript := preload("res://addons/ui_react/editor_plugin/services/ui_react_explain_graph_builder.gd")
+const _ComputedRebindScript := preload("res://addons/ui_react/editor_plugin/services/ui_react_computed_graph_rebind.gd")
+const _WireGraphEditScript := preload("res://addons/ui_react/editor_plugin/services/ui_react_wire_graph_edit_service.gd")
+const _WireRuleCatalogScript := preload("res://addons/ui_react/editor_plugin/services/ui_react_wire_rule_catalog.gd")
+const _WireStackCatalogScript := preload("res://addons/ui_react/editor_plugin/services/ui_react_wire_rule_stack_catalog.gd")
+const _ComputedMountsScript := preload("res://addons/ui_react/editor_plugin/services/ui_react_computed_resource_mounts.gd")
+const _NewBindingScript := preload("res://addons/ui_react/editor_plugin/services/ui_react_graph_new_binding_service.gd")
+const _ResolverScript := preload("res://addons/ui_react/editor_plugin/services/ui_react_graph_node_state_resolver.gd")
+const _ExplainLayoutScript := preload("res://addons/ui_react/editor_plugin/services/ui_react_explain_graph_layout.gd")
+const _ExplainGraphViewScript := preload("res://addons/ui_react/editor_plugin/dock/ui_react_explain_graph_view.gd")
+const _WireRulesSectionScript := preload("res://addons/ui_react/editor_plugin/dock/ui_react_dock_wire_rules_section.gd")
+const _WireDetailsScript := preload("res://addons/ui_react/editor_plugin/dock/ui_react_dock_wire_details.gd")
+const _SnapScript := preload("res://addons/ui_react/editor_plugin/models/ui_react_explain_graph_snapshot.gd")
+const _GraphFactoryScript := preload("res://addons/ui_react/editor_plugin/services/ui_react_graph_resource_factory.gd")
+const _DockThemeScript := preload("res://addons/ui_react/editor_plugin/dock/ui_react_dock_theme.gd")
+
+const _LiveGraphProt := preload("res://addons/ui_react/scripts/runtime/ui_react_live_graph_protocol.gd")
+const _LiveGraphCtrlScript := preload(
+	"res://addons/ui_react/editor_plugin/services/ui_react_dock_live_graph_controller.gd"
+)
+const _DETAILS_GRAPH_HELP_BB := (
+	"[b]Move Around[/b]\n"
+	+ "[b]Pan[/b] with middle mouse drag, [b]zoom[/b] with the mouse wheel, and open menus with [b]right-click[/b].\n\n"
+	+ "[b]Edit Links[/b]\n"
+	+ "To [b]move an existing link[/b], select its edge, then [b]Shift+drag[/b] from the state at the arrow tail to another [b]State[/b] or [b]Computed[/b] node.\n"
+	+ "To [b]start a new link[/b], leave edges unselected and [b]Ctrl+Shift+drag[/b] between two nodes.\n"
+	+ "To [b]remove[/b] a selected edge, press [b]Delete[/b] when the dock allows it.\n\n"
+	+ "[b]Shapes[/b]\n"
+	+ "Each [b]node[/b]'s outline style shows whether it is a [b]control[/b], a [b]state[/b] resource, or a [b]computed[/b] resource."
+)
+const _DETAILS_GRAPH_HELP_PLAIN := (
+	"Move Around\n"
+	+ "Pan with middle mouse drag, zoom with the wheel, and use right-click for menus.\n\n"
+	+ "Edit Links\n"
+	+ "Move an existing link: select the edge, then Shift+drag from the state at the arrow tail to another State or Computed node.\n"
+	+ "Start a new link: leave edges unselected, then Ctrl+Shift+drag between two nodes.\n"
+	+ "Remove a selected edge: press Delete when the dock allows it.\n\n"
+	+ "Shapes\n"
+	+ "Each node's outline style shows whether it is a control, a state resource, or a computed resource."
+)
+
+## Minimum height used by [member _details] and VSplit clamp math so the lower pane stays usable.
+const _DETAILS_PANE_MIN_HEIGHT := 120
+
+const _SCOPE_MIN_NODES := 20
+const _SCOPE_MAX_NODES := 2000
+const _SCOPE_MIN_EDGES := 40
+const _SCOPE_MAX_EDGES := 4000
+
+const _LEGEND_GROUP_FONT_COLOR := Color(0.72, 0.74, 0.8, 0.92)
+const _LEGEND_STATUS_FONT_COLOR := Color(0.68, 0.7, 0.76, 0.9)
+## Subtle outline on non-selected legend rows; the focused row uses [member UiReactExplainGraphView.GRAPH_LEGEND_FOCUS_BORDER] at 2px.
+const _LEGEND_NODE_CHIP_BORDER := Color(1, 1, 1, 0.42)
+## Raised swatch behind edge color strips so binding/computed/wire reads on dark UI.
+const _LEGEND_EDGE_SWATCH_BG := Color(0.11, 0.12, 0.14, 0.72)
+const _LEGEND_EDGE_SWATCH_BORDER := Color(1, 1, 1, 0.38)
+
+var _plugin: EditorPlugin
+var _actions: UiReactActionController
+var _request_dock_refresh: Callable = Callable()
+
+var _hint: RichTextLabel
+var _hidden_chrome_host: Control
+var _cb_full_lists: CheckBox
+var _visual_host: VBoxContainer
+var _graph_body_split: VSplitContainer
+var _below_graph_column: VBoxContainer
+var _graph_split_restored: bool = false
+var _graph_split_restore_attempts: int = 0
+var _legend_host: VBoxContainer
+var _legend_nodes_row: HBoxContainer
+var _legend_edges_row: HBoxContainer
+var _legend_group_nodes_label: Label
+var _legend_group_edges_label: Label
+var _legend_scope_spacer: Control
+var _legend_scope_label: Label
+var _cb_bind: CheckBox
+var _cb_computed: CheckBox
+var _cb_wire: CheckBox
+var _cb_edge_labels: CheckBox
+var _graph_view: Control
+var _details: RichTextLabel
+var _wire_rules_section: UiReactDockWireRulesSection = null
+var _selection_actions_context_popup: PopupMenu
+var _canvas_view_context_popup: PopupMenu
+var _selection_create_bind_submenu_popup: PopupMenu
+var _selection_node_submenu_popup: PopupMenu
+var _selection_wire_submenu_popup: PopupMenu
+var _selection_wire_add_rule_submenu_popup: PopupMenu
+var _selection_wire_stacks_submenu_popup: PopupMenu
+var _selection_edge_edit_submenu_popup: PopupMenu
+var _canvas_create_submenu_popup: PopupMenu
+var _canvas_view_submenu_popup: PopupMenu
+var _canvas_scope_submenu_popup: PopupMenu
+var _canvas_scope_presets_popup: PopupMenu
+var _selection_scope_submenu_popup: PopupMenu
+var _selection_scope_presets_popup: PopupMenu
+## Indices align with menu ids [code]UiReactDockExplainMenuIds._CV_PRESET_NAMED_BASE + i[/code] when preset list is filled.
+var _scope_preset_pick_names: PackedStringArray = PackedStringArray()
+var _scope_preset_pick_abouts: PackedStringArray = PackedStringArray()
+var _canvas_create_state_names: PackedStringArray
+var _selection_create_bind_actions: Array[Dictionary] = []
+
+var _rebind_file_dialog: EditorFileDialog
+var _rebind_kind: int = UiReactDockExplainMenuIds._REBIND_NONE
+var _rebind_host_path: String = ""
+var _rebind_property: String = ""
+var _rebind_wire_host_path: String = ""
+var _rebind_wire_rule_index: int = -1
+var _rebind_wire_prop: StringName = &""
+var _rebind_computed_context: String = ""
+var _rebind_computed_source_index: int = -1
+
+var _newlink_binding_popup: PopupMenu
+var _newlink_pick_host: Control
+var _newlink_pick_component: String = ""
+var _newlink_pick_donor: UiState
+var _newlink_pick_candidates: Array = []
+
+var _newlink_mixed_popup: PopupMenu
+var _newlink_mixed_donor_st: UiState
+var _newlink_mixed_host: Control
+var _newlink_mixed_component: String = ""
+var _newlink_mixed_binding_cands: Array = []
+var _newlink_wire_filter_indices: PackedInt32Array = PackedInt32Array()
+var _newlink_no_wire_dialog: AcceptDialog
+
+var _newlink_mount_popup: PopupMenu
+var _newlink_mount_donor_st: UiState
+var _newlink_mount_list: Array = []
+
+var _auto_refresh_timer: Timer
+
+var _last_snap: Variant = null
+var _last_focus_id: String = ""
+## Scene-relative path for the graph scope host ([method refresh] selection); for wire list focus guard.
+var _last_focus_host_path: String = ""
+## Last successful [method refresh] wiring scope for [method capture_wiring_session_for_persist] (cleared in [method _clear_stale_snapshot]).
+var _session_scene_path: String = ""
+var _session_scope_node_path: String = ""
+var _last_layout: Dictionary = {}
+var _narrative_cache: Dictionary = {}
+var _show_full_lists: bool = false
+
+var _selection_kind: int = UiReactDockExplainMenuIds._SEL_NONE
+var _graph_selected_node_id: String = ""
+var _graph_selected_edge_index: int = -1
+var _last_edge_from_id: String = ""
+var _last_edge_to_id: String = ""
+var _last_edge_kind: int = -1
+var _last_edge_label: String = ""
+var _last_details_plain: String = ""
+
+var _create_state_save_dialog: EditorFileDialog
+var _create_state_class_pending: String = ""
+var _create_and_assign_mode: bool = false
+var _create_assign_host_path: String = ""
+var _create_assign_prop: StringName = &""
+var _create_assign_component: String = ""
+var _create_assign_expected_class: StringName = &""
+
+var _scope_preset_option: OptionButton
+var _scope_save_name_dialog: AcceptDialog
+var _scope_save_name_edit: LineEdit
+var _scope_save_about_edit: TextEdit
+var _scope_manage_dialog: AcceptDialog
+var _scope_manage_list: ItemList
+var _layout_max_nodes: int = 200
+var _layout_max_edges: int = 400
+var _pinned_node_ids: PackedStringArray = PackedStringArray()
+var _scope_presets_cache: Array = []
+var _scope_preset_block_select: bool = false
+## When true, next [AcceptDialog] confirm from Save scope preset also pins [member _pin_target_id_pending_after_save].
+var _pin_pending_after_save: bool = false
+var _pin_target_id_pending_after_save: String = ""
+
+var _explain_signal_scope: UiReactSubscriptionScope
+
+var _live_graph_buffer: Array = []
+var _live_graph_flush_armed: bool = false
+var _follow_refresh_min_interval_ms: int = 80
+var _last_follow_refresh_tick_msec: int = 0
+
+
+func setup(
+	plugin: EditorPlugin,
+	actions: UiReactActionController,
+	request_dock_refresh: Callable = Callable(),
+) -> void:
+	_plugin = plugin
+	_actions = actions
+	_request_dock_refresh = request_dock_refresh
+	if _explain_signal_scope != null:
+		_explain_signal_scope.dispose()
+	_explain_signal_scope = UiReactSubscriptionScope.new()
+	_build_ui()
+	if _details:
+		_DockThemeScript.apply_richtext_content(_details, _plugin)
+	if _hint:
+		_DockThemeScript.apply_richtext_content(_hint, _plugin)
+	_apply_graph_body_split_editor_theme()
+	_apply_legend_font_sizes()
+	if _legend_host:
+		_legend_host.visible = bool(
+			ProjectSettings.get_setting(UiReactDockConfig.KEY_GRAPH_LEGEND_VISIBLE, true)
+		)
+	_rebuild_scope_preset_dropdown()
+	_sync_active_scope_preset_from_settings(true)
+	_explain_signal_scope.connect_bound(tree_exiting, _on_explain_panel_tree_exiting)
+	call_deferred(&"_restore_graph_body_split_offset")
+	var ei := _plugin.get_editor_interface()
+	_explain_signal_scope.connect_bound(ei.get_selection().selection_changed, _on_editor_selection_changed)
+
+
+func refresh() -> void:
+	if _graph_view == null:
+		return
+	if _plugin == null:
+		_set_hint_visible(true)
+		_set_hint("Ui React is still starting up; open this tab again in a moment.")
+		_clear_stale_snapshot()
+		return
+	var ei := _plugin.get_editor_interface()
+	var root := ei.get_edited_scene_root()
+	if root == null:
+		_set_hint_visible(true)
+		_set_hint("Open a saved scene tab first—the graph needs an active edited scene.")
+		_clear_stale_snapshot()
+		return
+	var sel: Array[Node] = ei.get_selection().get_selected_nodes()
+	if sel.size() != 1:
+		_set_hint_visible(false)
+		if not _retain_last_graph_if_playing_scene(root):
+			_clear_stale_snapshot()
+		return
+	var n: Node = sel[0]
+	if not (n is Control):
+		_set_hint_visible(true)
+		_set_hint("Pick a Control node; the graph does not run on non-UI nodes.")
+		if not _retain_last_graph_if_playing_scene(root):
+			_clear_stale_snapshot()
+		return
+	if not UiReactScannerService.is_react_node(n):
+		_set_hint_visible(false)
+		if not _retain_last_graph_if_playing_scene(root):
+			_clear_stale_snapshot()
+		return
+	if not (n == root or root.is_ancestor_of(n)):
+		_set_hint_visible(true)
+		_set_hint("Pick a node that lives under the scene tab you are editing, not a stray editor pick.")
+		if not _retain_last_graph_if_playing_scene(root):
+			_clear_stale_snapshot()
+		return
+
+	_set_hint_visible(false)
+	_narrative_cache.clear()
+	var snap = _ExplainBuilderScript.build(root, n as Control)
+	_last_snap = snap
+	var hp: NodePath = _ExplainBuilderScript._host_path_from_root(root, n as Control)
+	_last_focus_id = _ExplainBuilderScript._control_id(hp)
+	_last_focus_host_path = str(hp)
+
+	_apply_visual_from_snap_safe(snap, _last_focus_id)
+
+	_session_scene_path = String(root.scene_file_path)
+	_session_scope_node_path = str(hp)
+
+
+func capture_wiring_session_for_persist() -> void:
+	if _session_scope_node_path.is_empty():
+		UiReactDockConfig.save_wiring_restore_state("", "", "")
+		return
+	var graph_id := ""
+	if _selection_kind == UiReactDockExplainMenuIds._SEL_NODE and not _graph_selected_node_id.is_empty():
+		graph_id = _graph_selected_node_id
+	UiReactDockConfig.save_wiring_restore_state(_session_scene_path, _session_scope_node_path, graph_id)
+
+
+func _apply_follow_scope_host_path(host_relpath: String) -> bool:
+	if _plugin == null or host_relpath.strip_edges().is_empty():
+		return false
+	var ei := _plugin.get_editor_interface()
+	var root := ei.get_edited_scene_root()
+	if root == null or not root.has_node(NodePath(host_relpath)):
+		return false
+	var node: Node = root.get_node(NodePath(host_relpath))
+	if not (node is Control):
+		return false
+	if not UiReactScannerService.is_react_node(node as Control):
+		return false
+	if not (node == root or root.is_ancestor_of(node)):
+		return false
+	ei.get_selection().clear()
+	ei.get_selection().add_node(node)
+	refresh()
+	return not _last_focus_host_path.is_empty() and not _last_layout.is_empty()
+
+
+func ingest_live_graph_debug_message(message: String, data: Variant) -> void:
+	if data is not Array:
+		return
+	var pl := data as Array
+	if _live_graph_buffer.size() >= 128:
+		_live_graph_buffer.pop_front()
+	_live_graph_buffer.append({&"m": message, &"p": pl})
+	if _live_graph_flush_armed:
+		return
+	_live_graph_flush_armed = true
+	call_deferred(&"_flush_live_graph_buffer")
+
+
+func _flush_live_graph_buffer() -> void:
+	_live_graph_flush_armed = false
+	if _graph_view == null:
+		_live_graph_buffer.clear()
+		return
+	var batch: Array = _live_graph_buffer.duplicate(true)
+	_live_graph_buffer.clear()
+
+	if _last_layout.is_empty():
+		if _plugin == null:
+			return
+		var ei_boot := _plugin.get_editor_interface()
+		if not ei_boot.is_playing_scene():
+			return
+		var rt_boot := ei_boot.get_edited_scene_root()
+		if rt_boot == null:
+			return
+		var scene_p := String(rt_boot.scene_file_path)
+		if scene_p.is_empty():
+			return
+		var host_boot: String = UiReactDockLiveGraphController.bootstrap_scope_host_path_from_batch(
+			batch, scene_p, rt_boot
+		)
+		if host_boot.is_empty() or not _apply_follow_scope_host_path(host_boot):
+			return
+		# _last_layout / _session_scene_path now match this play session; apply pulses from the same batch.
+
+	var pm := UiReactDockConfig.clamp_editor_play_mode(
+		int(ProjectSettings.get_setting(UiReactDockConfig.KEY_EDITOR_PLAY_MODE, UiReactDockConfig.DEF_EDITOR_PLAY_MODE))
+	)
+	var follow_applied_this_flush := false
+	if UiReactDockConfig.editor_play_mode_includes_follow(pm) and _plugin != null:
+		var now_follow := Time.get_ticks_msec()
+		if now_follow - _last_follow_refresh_tick_msec >= _follow_refresh_min_interval_ms:
+			var ei0 := _plugin.get_editor_interface()
+			var rt := ei0.get_edited_scene_root()
+			if rt != null and String(rt.scene_file_path) == _session_scene_path:
+				var esl_pick: UiReactExplainGraphSnapshot = _last_snap as UiReactExplainGraphSnapshot
+				var tgt := _LiveGraphCtrlScript.follow_scope_host_path_from_batch(
+					esl_pick, batch, _session_scene_path, _last_focus_host_path, rt
+				)
+				if not tgt.is_empty() and _apply_follow_scope_host_path(tgt):
+					follow_applied_this_flush = true
+					_last_follow_refresh_tick_msec = now_follow
+
+	var dedup_e: Dictionary = {}
+	var dedup_n: Dictionary = {}
+	for item: Variant in batch:
+		if item is not Dictionary:
+			continue
+		var w: Dictionary = item as Dictionary
+		var msg := String(w.get(&"m", ""))
+		var plv: Variant = w.get(&"p", [])
+		if plv is not Array:
+			continue
+		var tpl: Array = plv as Array
+		match msg:
+			_LiveGraphProt.MSG_V1_WIRE:
+				if tpl.size() < 5:
+					continue
+				if String(tpl[0]) != _session_scene_path:
+					continue
+				var hp := String(tpl[1])
+				if not _LiveGraphCtrlScript.descendant_or_equal_event_to_focus(hp, _last_focus_host_path):
+					continue
+				var eds: Array = _last_layout.get(&"draw_edges", []) as Array
+				var indices := _LiveGraphCtrlScript.edge_draw_indices_wire(
+					eds,
+					_SnapScript.EdgeKind.WIRE_FLOW,
+					hp,
+					int(tpl[2]),
+				)
+				for ij in indices:
+					dedup_e[int(ij)] = true
+			_LiveGraphProt.MSG_V1_CMP:
+				if tpl.size() < 3:
+					continue
+				if String(tpl[0]) != _session_scene_path:
+					continue
+				var esl_snap: UiReactExplainGraphSnapshot = _last_snap as UiReactExplainGraphSnapshot
+				if esl_snap == null:
+					continue
+				var nid := _LiveGraphCtrlScript.resolve_computed_node_id(
+					esl_snap.nodes,
+					String(tpl[1]),
+					int(tpl[2]),
+				)
+				if nid.is_empty():
+					continue
+				var nb: Dictionary = _last_layout.get(&"node_by_id", {}) as Dictionary
+				if not nb.has(nid):
+					continue
+				dedup_n[nid] = true
+			_LiveGraphProt.MSG_V1_ACT:
+				if tpl.size() < 5:
+					continue
+				if String(tpl[0]) != _session_scene_path:
+					continue
+				var opr := String(tpl[1])
+				if not _LiveGraphCtrlScript.descendant_or_equal_event_to_focus(opr, _last_focus_host_path):
+					continue
+				var cid := _ExplainBuilderScript._control_id(NodePath(opr))
+				var nb2: Dictionary = _last_layout.get(&"node_by_id", {}) as Dictionary
+				if not nb2.has(cid):
+					continue
+				dedup_n[cid] = true
+	if dedup_e.is_empty() and dedup_n.is_empty():
+		return
+	var e_out := PackedInt32Array()
+	for ke in dedup_e.keys():
+		e_out.append(int(ke))
+	var n_out := PackedStringArray()
+	for kn in dedup_n.keys():
+		n_out.append(String(kn))
+	if _graph_view.has_method(&"apply_live_graph_pulse_batch"):
+		_graph_view.call(&"apply_live_graph_pulse_batch", e_out, n_out, 350)
+	if follow_applied_this_flush and _graph_view != null:
+		var scroll_id := ""
+		if not n_out.is_empty():
+			scroll_id = String(n_out[0])
+		if not scroll_id.is_empty() and _graph_view.has_method(&"scroll_graph_to_node_id"):
+			_graph_view.call(&"scroll_graph_to_node_id", scroll_id)
+
+
+## Returns [code]true[/code] if this method ran [method refresh] (session restore path). [code]false[/code] if it exited early so the dock may call [method UiReactDockWiringPanel.refresh] as fallback.
+func restore_wiring_session_from_project_settings() -> bool:
+	if _plugin == null or _graph_view == null:
+		return false
+	var ei := _plugin.get_editor_interface()
+	var root := ei.get_edited_scene_root()
+	if root == null:
+		return false
+	var sess: Dictionary = UiReactDockConfig.get_wiring_restore_state()
+	var stored_scene := String(sess.get("scene_path", ""))
+	var stored_scope_node_path := String(sess.get("scope_node_path", ""))
+	var stored_graph_node_id := String(sess.get("graph_node_id", ""))
+	var cur_scene := String(root.scene_file_path)
+	if stored_scene != cur_scene:
+		return false
+	if stored_scope_node_path.is_empty():
+		return false
+	if not root.has_node(NodePath(stored_scope_node_path)):
+		return false
+	var scope_node: Node = root.get_node(NodePath(stored_scope_node_path))
+	if not (scope_node is Control):
+		return false
+	if not UiReactScannerService.is_react_node(scope_node):
+		return false
+	if not (scope_node == root or root.is_ancestor_of(scope_node)):
+		return false
+	ei.get_selection().clear()
+	ei.get_selection().add_node(scope_node)
+	refresh()
+	if stored_graph_node_id.is_empty():
+		return true
+	var nb: Dictionary = _last_layout.get(&"node_by_id", {}) as Dictionary
+	if not nb.has(stored_graph_node_id):
+		return true
+	if _graph_view.has_method(&"select_node_by_id"):
+		_graph_view.call(&"select_node_by_id", stored_graph_node_id)
+	return true
+
+
+func _on_editor_selection_changed() -> void:
+	if _auto_refresh_timer == null:
+		return
+	_auto_refresh_timer.stop()
+	_auto_refresh_timer.start()
+
+
+func _on_debounced_auto_refresh() -> void:
+	if not is_visible_in_tree():
+		return
+	refresh()
+
+
+func _apply_visual_from_snap_safe(snap: Variant, focus_id: String) -> void:
+	if _graph_view == null:
+		return
+	var layout: Dictionary = _ExplainLayoutScript.layout_snapshot(
+		snap,
+		focus_id,
+		_layout_max_nodes,
+		_layout_max_edges,
+		_pinned_node_ids,
+	)
+	_last_layout = layout
+	_set_legend_scope_from_layout(layout)
+	var centers: Dictionary = layout.get(&"node_centers", {}) as Dictionary
+	if centers.is_empty():
+		_graph_view.clear_graph()
+		_set_details_empty()
+		_set_hint_visible(true)
+		_set_hint("Nothing landed in this graph scope—raise node/edge caps, turn filters back on, or click Refresh after Inspector edits.")
+		_sync_wire_rules_section()
+		return
+	(_graph_view as Object).call(&"set_layout", layout)
+	_push_visual_filters()
+	if _graph_view.has_method(&"select_node_by_id"):
+		_graph_view.call(&"select_node_by_id", focus_id)
+
+
+func _push_visual_filters() -> void:
+	if _graph_view == null:
+		return
+	var b := _cb_bind == null or _cb_bind.button_pressed
+	var c := _cb_computed == null or _cb_computed.button_pressed
+	var w := _cb_wire == null or _cb_wire.button_pressed
+	var lbl := _cb_edge_labels != null and _cb_edge_labels.button_pressed
+	(_graph_view as Object).call(&"set_edge_filters", b, c, w, lbl)
+
+
+func _on_fit_pressed() -> void:
+	if _graph_view and _graph_view.has_method(&"fit_content_to_view"):
+		_graph_view.call(&"fit_content_to_view")
+
+
+func _on_graph_node(id: String) -> void:
+	_graph_selected_node_id = id
+	_graph_selected_edge_index = -1
+	_selection_kind = UiReactDockExplainMenuIds._SEL_NODE
+	_sync_wire_rules_section()
+	_fill_node_details(id)
+
+
+func _on_graph_edge(from_id: String, to_id: String, kind: int, label: String, edge_index: int) -> void:
+	_graph_selected_node_id = ""
+	_graph_selected_edge_index = edge_index
+	_last_edge_from_id = from_id
+	_last_edge_to_id = to_id
+	_last_edge_kind = kind
+	_last_edge_label = label
+	_selection_kind = UiReactDockExplainMenuIds._SEL_EDGE
+	_sync_wire_rules_section()
+	_fill_edge_details(from_id, to_id, kind, label, edge_index)
+	_try_focus_wire_rule_list_from_edge(kind, edge_index)
+
+
+func _on_graph_cleared() -> void:
+	_graph_selected_node_id = ""
+	_graph_selected_edge_index = -1
+	_selection_kind = UiReactDockExplainMenuIds._SEL_NONE
+	_set_details_placeholder()
+	_sync_wire_rules_section()
+
+
+func _scope_current_matches_saved_named_preset(active_name: String) -> bool:
+	var n := active_name.strip_edges()
+	if n.is_empty() or n.to_lower() == "default":
+		return false
+	var raw := UiReactDockExplainScopePresets.find_raw_preset_variant_by_name(n)
+	if raw == null:
+		return false
+	var saved := _preset_from_variant(raw)
+	var cur := _capture_current_scope_settings(n)
+	cur[&"about"] = UiReactDockExplainScopePresets.stored_about_for_preset_name(n)
+	return UiReactDockExplainScopeMenus.scope_dict_matches_for_update(saved, cur)
+
+
+func _resolve_pin_target_graph_node_id() -> String:
+	if _selection_kind == UiReactDockExplainMenuIds._SEL_NODE:
+		return String(_graph_selected_node_id).strip_edges()
+	if _selection_kind != UiReactDockExplainMenuIds._SEL_EDGE or _graph_selected_edge_index < 0:
+		return ""
+	var edges: Array = _last_layout.get(&"draw_edges", []) as Array
+	var idx := _graph_selected_edge_index
+	if idx < 0 or idx >= edges.size():
+		return ""
+	var ev: Variant = edges[idx]
+	if ev is not Dictionary:
+		return ""
+	var ed: Dictionary = ev as Dictionary
+	var kind := int(ed.get(&"kind", -1))
+	if kind == _SnapScript.EdgeKind.BINDING:
+		var hp := str(ed.get(&"host_path", "")).strip_edges()
+		if hp.is_empty():
+			return ""
+		return "ctrl:%s" % hp
+	if kind == _SnapScript.EdgeKind.WIRE_FLOW:
+		var wh := str(ed.get(&"wire_host_path", "")).strip_edges()
+		if wh.is_empty():
+			return ""
+		return "ctrl:%s" % wh
+	if kind == _SnapScript.EdgeKind.COMPUTED_SOURCE:
+		return str(ed.get(&"to_id", "")).strip_edges()
+	return ""
+
+
+func _pin_graph_node_to_active_preset(node_id: String) -> void:
+	var pid := String(node_id).strip_edges()
+	if pid.is_empty():
+		push_warning(
+			"Ui React: nothing to pin for the current graph selection. Select a node or edge first, then use Pin node."
+		)
+		return
+	var active: String = String(UiReactDockConfig.get_active_graph_scope_preset_name()).strip_edges()
+	if active.is_empty() or active.to_lower() == "default":
+		_pin_pending_after_save = true
+		_pin_target_id_pending_after_save = pid
+		if _scope_save_name_dialog != null and _scope_save_name_edit != null:
+			_scope_save_name_dialog.title = "Save scope preset and pin node"
+			_scope_save_name_dialog.dialog_text = (
+				"Creates a named preset from the current scope settings and adds the selected graph node to its pin list."
+			)
+			_scope_save_name_edit.text = "Pinned scope"
+			if _scope_save_about_edit != null:
+				_scope_save_about_edit.text = ""
+			_scope_save_name_dialog.popup_centered()
+		return
+	for i in range(_pinned_node_ids.size()):
+		if _pinned_node_ids[i] == pid:
+			return
+	_pinned_node_ids.append(pid)
+	var arr: Array = UiReactDockExplainScopePresets.load_sorted_presets_raw()
+	var out: Array = []
+	var updated := false
+	for it: Variant in arr:
+		if it is Dictionary:
+			var pd: Dictionary = _preset_from_variant(it)
+			if String(pd.get("name", "")) == active:
+				pd[&"pinned"] = _pinned_node_ids.duplicate()
+				updated = true
+			out.append(pd)
+	if not updated:
+		var cap := _capture_current_scope_settings(active)
+		cap[&"about"] = UiReactDockExplainScopePresets.stored_about_for_preset_name(active)
+		out.append(cap)
+	_persist_presets_array(out)
+	refresh()
+
+
+func _fill_scope_presets_list(presets_popup: PopupMenu) -> void:
+	presets_popup.clear()
+	_scope_preset_pick_names.clear()
+	_scope_preset_pick_abouts.clear()
+	presets_popup.add_item("Default", UiReactDockExplainMenuIds._CV_PRESET_DEFAULT)
+	presets_popup.set_item_tooltip(
+		presets_popup.item_count - 1, "Built-in graph scope (not a saved preset)."
+	)
+	var names: Array[String] = []
+	var about_by_name: Dictionary = {}
+	for it: Variant in UiReactDockExplainScopePresets.load_sorted_presets_raw():
+		if it is not Dictionary:
+			continue
+		var d: Dictionary = it as Dictionary
+		var nm := String(d.get("name", "")).strip_edges()
+		if nm.is_empty() or nm.to_lower() == "default":
+			continue
+		names.append(nm)
+		about_by_name[nm] = String(d.get("about", d.get(&"about", ""))).strip_edges()
+	names.sort()
+	for i in range(names.size()):
+		var nm2: String = names[i]
+		presets_popup.add_item(nm2, UiReactDockExplainMenuIds._CV_PRESET_NAMED_BASE + i)
+		_scope_preset_pick_names.append(nm2)
+		var abt: String = String(about_by_name.get(nm2, "")).strip_edges()
+		_scope_preset_pick_abouts.append(abt)
+		var tip_i := presets_popup.item_count - 1
+		if abt.is_empty():
+			presets_popup.set_item_tooltip(tip_i, "No notes saved for this preset.")
+		else:
+			presets_popup.set_item_tooltip(tip_i, abt)
+
+
+func _fill_scope_submenu(scope_popup: PopupMenu, presets_popup: PopupMenu) -> void:
+	scope_popup.clear()
+	_fill_scope_presets_list(presets_popup)
+	scope_popup.add_submenu_node_item("Presets", presets_popup, UiReactDockExplainMenuIds._CV_SUB_PRESETS_LIST)
+	scope_popup.add_item("Save scope preset as…", UiReactDockExplainMenuIds._CV_SCOPE_SAVE)
+	scope_popup.set_item_tooltip(
+		scope_popup.item_count - 1, "Save the current graph caps, filters, and pins under a new preset name."
+	)
+	var active: String = String(UiReactDockConfig.get_active_graph_scope_preset_name()).strip_edges()
+	if not active.is_empty() and active.to_lower() != "default":
+		scope_popup.add_item('Update "%s"' % active, UiReactDockExplainMenuIds._CV_SCOPE_UPDATE)
+		scope_popup.set_item_tooltip(
+			scope_popup.item_count - 1,
+			"Overwrite the active preset with what you see now (caps, filters, pins, notes).",
+		)
+		var uidx := scope_popup.get_item_index(UiReactDockExplainMenuIds._CV_SCOPE_UPDATE)
+		if uidx >= 0:
+			var missing := UiReactDockExplainScopePresets.find_raw_preset_variant_by_name(active) == null
+			scope_popup.set_item_disabled(uidx, missing or _scope_current_matches_saved_named_preset(active))
+			if missing:
+				scope_popup.set_item_tooltip(uidx, "That preset is no longer in saved settings—open Manage scope presets.")
+	scope_popup.add_item("Manage scope presets…", UiReactDockExplainMenuIds._CV_SCOPE_MANAGE)
+	scope_popup.set_item_tooltip(scope_popup.item_count - 1, "Rename, review, or delete saved graph scope presets.")
+	var pin_id := _resolve_pin_target_graph_node_id()
+	if not pin_id.is_empty():
+		scope_popup.add_item("Pin node", UiReactDockExplainMenuIds._CV_SCOPE_PIN)
+		scope_popup.set_item_tooltip(
+			scope_popup.item_count - 1,
+			"Pins the graph node tied to this selection so it stays in scope (same anchor as Focus in Inspector on edges).",
+		)
+
+
+func _on_scope_presets_list_id(id: int) -> void:
+	if id == UiReactDockExplainMenuIds._CV_PRESET_DEFAULT:
+		_apply_scope_preset_by_name("")
+		return
+	if id >= UiReactDockExplainMenuIds._CV_PRESET_NAMED_BASE:
+		var pi := id - UiReactDockExplainMenuIds._CV_PRESET_NAMED_BASE
+		if pi >= 0 and pi < _scope_preset_pick_names.size():
+			_apply_scope_preset_by_name(_scope_preset_pick_names[pi])
+		return
+
+
+func _on_scope_actions_submenu_id(id: int) -> void:
+	if id == UiReactDockExplainMenuIds._CV_SCOPE_SAVE:
+		_on_scope_save_as_pressed()
+		return
+	if id == UiReactDockExplainMenuIds._CV_SCOPE_MANAGE:
+		_on_scope_manage_pressed()
+		return
+	if id == UiReactDockExplainMenuIds._CV_SCOPE_UPDATE:
+		_on_scope_update_current_preset_pressed()
+		return
+	if id == UiReactDockExplainMenuIds._CV_SCOPE_PIN:
+		var pid := _resolve_pin_target_graph_node_id()
+		if not pid.is_empty():
+			_pin_graph_node_to_active_preset(pid)
+		return
+
+
+func _on_scope_update_current_preset_pressed() -> void:
+	var n := String(UiReactDockConfig.get_active_graph_scope_preset_name()).strip_edges()
+	if n.is_empty() or n.to_lower() == "default":
+		return
+	if _scope_current_matches_saved_named_preset(n):
+		return
+	var raw := UiReactDockExplainScopePresets.find_raw_preset_variant_by_name(n)
+	if raw == null:
+		push_warning(
+			"Ui React: the active scope preset file entry is missing. Open Manage scope presets or save a new preset, then try Update again."
+		)
+		return
+	var rec := _capture_current_scope_settings(n)
+	rec[&"about"] = UiReactDockExplainScopePresets.stored_about_for_preset_name(n)
+	var arr: Array = UiReactDockExplainScopePresets.load_sorted_presets_raw()
+	var out: Array = []
+	var found := false
+	for it: Variant in arr:
+		if it is Dictionary:
+			var old: Dictionary = _preset_from_variant(it)
+			if String(old.get("name", "")) == n:
+				out.append(rec)
+				found = true
+			else:
+				out.append(old)
+	if not found:
+		push_warning(
+			"Ui React: could not update that preset because it disappeared from the saved list. Rescan presets from Manage scope presets."
+		)
+		return
+	_persist_presets_array(out)
+	UiReactDockConfig.set_active_graph_scope_preset_name(n)
+	_sync_active_scope_preset_from_settings(true)
+	refresh()
+
+
+func _resolve_wire_rules_host_control() -> Control:
+	if _plugin == null:
+		return null
+	var ei := _plugin.get_editor_interface()
+	var root := ei.get_edited_scene_root()
+	if root == null:
+		return null
+	if _selection_kind == UiReactDockExplainMenuIds._SEL_EDGE and _last_edge_kind == _SnapScript.EdgeKind.WIRE_FLOW:
+		var edges: Array = _last_layout.get(&"draw_edges", []) as Array
+		var idx := _graph_selected_edge_index
+		if idx >= 0 and idx < edges.size():
+			var ev: Variant = edges[idx]
+			if ev is Dictionary:
+				var wh := str((ev as Dictionary).get(&"wire_host_path", ""))
+				if not wh.is_empty() and root.has_node(NodePath(wh)):
+					var n: Node = root.get_node(NodePath(wh))
+					if n is Control and (&"wire_rules" in n):
+						return n as Control
+	if _selection_kind == UiReactDockExplainMenuIds._SEL_NODE and _graph_selected_node_id.begins_with("ctrl:"):
+		var pstr := _graph_selected_node_id.substr(5)
+		if root.has_node(NodePath(pstr)):
+			var n2: Node = root.get_node(NodePath(pstr))
+			if n2 is Control and (&"wire_rules" in n2):
+				return n2 as Control
+	var sel: Array[Node] = ei.get_selection().get_selected_nodes()
+	if sel.size() == 1:
+		var n3: Node = sel[0]
+		if (&"wire_rules" in n3) and n3 is Control and (n3 == root or root.is_ancestor_of(n3)):
+			return n3 as Control
+	return null
+
+
+func _resolve_control_host_from_node(node_id: String, d: Dictionary) -> Control:
+	if _plugin == null:
+		return null
+	var ei := _plugin.get_editor_interface()
+	var root := ei.get_edited_scene_root()
+	if root == null:
+		return null
+	var path_str := str(d.get(&"control_path", ""))
+	if path_str.is_empty() and node_id.begins_with("ctrl:"):
+		path_str = node_id.substr(5)
+	if path_str.is_empty() or not root.has_node(NodePath(path_str)):
+		return null
+	var n: Node = root.get_node(NodePath(path_str))
+	if n is Control and UiReactScannerService.is_react_node(n as Control):
+		return n as Control
+	return null
+
+
+func _sync_wire_rules_section() -> void:
+	if _wire_rules_section == null or _plugin == null:
+		return
+	var ei := _plugin.get_editor_interface()
+	var root := ei.get_edited_scene_root()
+	if root == null:
+		_wire_rules_section.set_target_host(null, null)
+		return
+	var h := _resolve_wire_rules_host_control()
+	if h != null:
+		_wire_rules_section.set_target_host(h, root)
+	else:
+		_wire_rules_section.set_target_host(null, null)
+
+
+func _after_wire_rules_section_commit() -> void:
+	if _request_dock_refresh.is_valid():
+		_request_dock_refresh.call()
+	refresh()
+	if _wire_rules_section != null:
+		_wire_rules_section.refresh_from_host()
+
+
+func _on_wire_rule_list_selection_changed(rule_index: int) -> void:
+	if _selection_kind == UiReactDockExplainMenuIds._SEL_NODE and not _graph_selected_node_id.is_empty():
+		_fill_node_details(_graph_selected_node_id)
+		return
+	if _selection_kind == UiReactDockExplainMenuIds._SEL_EDGE and _graph_selected_edge_index >= 0:
+		var new_ei := _find_first_visible_wire_flow_edge_index_for_rule(rule_index)
+		if (
+			new_ei >= 0
+			and new_ei != _graph_selected_edge_index
+			and _graph_view != null
+			and _graph_view.has_method(&"select_edge_by_index")
+		):
+			if bool((_graph_view as Object).call(&"select_edge_by_index", new_ei)):
+				return
+		_fill_edge_details(
+			_last_edge_from_id,
+			_last_edge_to_id,
+			_last_edge_kind,
+			_last_edge_label,
+			_graph_selected_edge_index
+		)
+
+
+## Graph RMB context menu — same builder as former Actions… MenuButton.
+func _fill_selection_actions_popup(popup: PopupMenu) -> void:
+	popup.clear()
+	const TT_COPY := "Copy the plain-text details panel to the clipboard."
+	const TT_FOCUS := "Open the related scene node or resource in the Inspector when Godot allows it."
+
+	if _selection_kind != UiReactDockExplainMenuIds._SEL_NONE:
+		popup.add_item("Focus in Inspector", UiReactDockExplainMenuIds._SEL_ACT_FOCUS_INSPECTOR)
+		popup.set_item_tooltip(popup.item_count - 1, TT_FOCUS)
+	if (
+		(_selection_kind == UiReactDockExplainMenuIds._SEL_NODE or _selection_kind == UiReactDockExplainMenuIds._SEL_EDGE)
+		and _selection_scope_submenu_popup != null
+		and _selection_scope_presets_popup != null
+	):
+		_fill_scope_submenu(_selection_scope_submenu_popup, _selection_scope_presets_popup)
+		popup.add_submenu_node_item("Scope", _selection_scope_submenu_popup, UiReactDockExplainMenuIds._SEL_SUB_SCOPE_ROOT)
+	var any_edge_item_will := (
+		_can_rebind_binding_edge()
+		or _can_rebind_wire_endpoint(true)
+		or _can_rebind_wire_endpoint(false)
+		or _can_rebind_computed_source()
+		or _can_disconnect_binding_edge()
+		or _can_disconnect_computed_source()
+		or _can_disconnect_wire_edge()
+		or _can_move_computed_source_up()
+		or _can_move_computed_source_down()
+		or _can_remove_computed_source_slot()
+		or _can_create_and_assign_binding_edge()
+	)
+	var edge_edit_action_count := _selection_edge_edit_action_count()
+	var wire_host := _resolve_wire_rules_host_control()
+	if _selection_kind == UiReactDockExplainMenuIds._SEL_NODE and _selection_node_submenu_popup != null:
+		var show_bind_create := (
+			_selection_create_bind_submenu_popup != null and _can_create_and_bind_from_selected_node()
+		)
+		if show_bind_create:
+			_fill_selection_node_submenu(_selection_node_submenu_popup)
+			popup.add_submenu_node_item("Node", _selection_node_submenu_popup, UiReactDockExplainMenuIds._SEL_SUB_NODE_ROOT)
+	if wire_host != null and _selection_wire_submenu_popup != null:
+		_fill_selection_wire_submenu(_selection_wire_submenu_popup)
+		if _selection_wire_submenu_popup.item_count > 0:
+			popup.add_submenu_node_item("Wire", _selection_wire_submenu_popup, UiReactDockExplainMenuIds._SEL_SUB_WIRE_ROOT)
+	if any_edge_item_will and _selection_edge_edit_submenu_popup != null:
+		if edge_edit_action_count <= 1:
+			_append_single_edge_edit_action_to_menu(popup)
+		else:
+			_fill_selection_edge_edit_submenu(_selection_edge_edit_submenu_popup)
+			popup.add_submenu_node_item(
+				"Edge edit", _selection_edge_edit_submenu_popup, UiReactDockExplainMenuIds._SEL_SUB_EDGE_EDIT_ROOT
+			)
+	if popup.item_count > 0:
+		popup.add_separator()
+	popup.add_item("Copy details", UiReactDockExplainMenuIds._SEL_ACT_COPY_DETAILS)
+	popup.set_item_tooltip(popup.item_count - 1, TT_COPY)
+
+
+func _fill_selection_node_submenu(popup: PopupMenu) -> void:
+	popup.clear()
+	if _selection_create_bind_submenu_popup != null and _can_create_and_bind_from_selected_node():
+		_fill_selection_create_bind_submenu(_selection_create_bind_submenu_popup)
+		popup.add_submenu_node_item(
+			"Create state & bind…", _selection_create_bind_submenu_popup, UiReactDockExplainMenuIds._SEL_SUB_CREATE_BIND_ROOT
+		)
+
+
+func _fill_selection_wire_submenu(popup: PopupMenu) -> void:
+	popup.clear()
+	const TT_WIRE_REFRESH := "Reload the Wire rules list after edits elsewhere or Undo."
+	const TT_WIRE_COPY_REP := "Copy the selected wire rule report from the list below."
+	var wentries := _WireRuleCatalogScript.rule_script_entries()
+	if _selection_wire_add_rule_submenu_popup != null and wentries.size() > 0:
+		_fill_wire_add_rule_submenu(_selection_wire_add_rule_submenu_popup, wentries)
+		popup.add_submenu_node_item(
+			"Add rule…",
+			_selection_wire_add_rule_submenu_popup,
+			UiReactDockExplainMenuIds._SEL_SUB_WIRE_ADD_RULE_ROOT,
+		)
+	if _selection_wire_stacks_submenu_popup != null:
+		_fill_wire_stacks_submenu(_selection_wire_stacks_submenu_popup)
+		popup.add_submenu_node_item(
+			"Stacks",
+			_selection_wire_stacks_submenu_popup,
+			UiReactDockExplainMenuIds._SEL_ACT_WIRE_STACK_SUBMENU_ROOT,
+		)
+	if popup.item_count > 0:
+		popup.add_separator()
+	popup.add_item("Refresh wire list", UiReactDockExplainMenuIds._SEL_ACT_WIRE_REFRESH_LIST)
+	popup.set_item_tooltip(popup.item_count - 1, TT_WIRE_REFRESH)
+	popup.add_item("Copy rule details", UiReactDockExplainMenuIds._SEL_ACT_WIRE_COPY_RULE_REPORT)
+	popup.set_item_tooltip(popup.item_count - 1, TT_WIRE_COPY_REP)
+	var cr_i := popup.get_item_index(UiReactDockExplainMenuIds._SEL_ACT_WIRE_COPY_RULE_REPORT)
+	if cr_i >= 0 and _wire_rules_section != null:
+		var sel_ix: int = _wire_rules_section.get_selected_rule_index()
+		popup.set_item_disabled(cr_i, sel_ix < 0)
+
+
+## Fills nested **Wire → Stacks** from [UiReactWireRuleStackCatalog] ([code]CB-063[/code]).
+func _fill_wire_stacks_submenu(p: PopupMenu) -> void:
+	p.clear()
+	var sentry: Array[Dictionary] = _WireStackCatalogScript.stack_entries()
+	for i: int in range(sentry.size()):
+		var e: Dictionary = sentry[i]
+		p.add_item(
+			"Add stack: %s" % String(e.get(&"label", &"")),
+			UiReactDockExplainMenuIds._SEL_ACT_WIRE_STACK_ADD_BASE + i,
+		)
+		p.set_item_tooltip(p.get_item_count() - 1, String(e.get(&"about", &"")))
+
+
+## Fills nested **Wire → Add rule…** from [UiReactWireRuleCatalog].
+func _fill_wire_add_rule_submenu(p: PopupMenu, wentries: Array) -> void:
+	p.clear()
+	for j: int in range(wentries.size()):
+		p.add_item(
+			"Add wire: %s" % String(wentries[j][&"label"]),
+			UiReactDockExplainMenuIds._SEL_ACT_WIRE_ADD_BASE + j,
+		)
+
+
+func _fill_selection_edge_edit_submenu(popup: PopupMenu) -> void:
+	popup.clear()
+	const TT_REBIND_BINDING := (
+		"Pick another saved state file for this Inspector binding (you can undo). "
+		+ "For wire rows use Rebind wire input/output; for computed inputs use Rebind computed source or Shift-drag from the tail node."
+	)
+	const TT_REBIND_WIRE_IN := (
+		"Pick another state for this wire rule’s input slot (you can undo). Does not apply to pure computed edges."
+	)
+	const TT_REBIND_WIRE_OUT := (
+		"Pick another state for this wire rule’s output slot (you can undo). Does not apply to pure computed edges."
+	)
+	const TT_REBIND_COMPUTED := (
+		"Swap one input on the computed resource for another state (you can undo). "
+		+ "If the action stays disabled, click Refresh; you can also Shift-drag from the upstream node to a new target."
+	)
+	const TT_CLEAR_BINDING := "Clears an optional binding here; required bindings must be edited in the Inspector."
+	const TT_REMOVE_COMPUTED := "Removes one computed input slot (you can undo). Refresh the graph if the row looks stale."
+	const TT_CLEAR_WIRE := "Clears both ends of this wire link in one undo; both slots must already be filled."
+	const TT_MOVE_UP := "Moves this computed input one step earlier in the list (you can undo)."
+	const TT_MOVE_DOWN := "Moves this computed input one step later in the list (you can undo)."
+	const TT_REMOVE_SLOT := "Deletes this computed input index and packs the list (you can undo)."
+	const TT_CREATE_ASSIGN := "Creates a new matching state file and assigns it to an empty optional binding (you can undo)."
+
+	var rebind_added := false
+	if _can_rebind_binding_edge():
+		popup.add_item("Rebind to resource…", UiReactDockExplainMenuIds._SEL_ACT_REBIND_BINDING)
+		popup.set_item_tooltip(popup.item_count - 1, TT_REBIND_BINDING)
+		rebind_added = true
+	if _can_rebind_wire_endpoint(true):
+		popup.add_item("Rebind wire input…", UiReactDockExplainMenuIds._SEL_ACT_REBIND_WIRE_IN)
+		popup.set_item_tooltip(popup.item_count - 1, TT_REBIND_WIRE_IN)
+		rebind_added = true
+	if _can_rebind_wire_endpoint(false):
+		popup.add_item("Rebind wire output…", UiReactDockExplainMenuIds._SEL_ACT_REBIND_WIRE_OUT)
+		popup.set_item_tooltip(popup.item_count - 1, TT_REBIND_WIRE_OUT)
+		rebind_added = true
+	if _can_rebind_computed_source():
+		popup.add_item("Rebind computed source…", UiReactDockExplainMenuIds._SEL_ACT_REBIND_COMPUTED_SRC)
+		popup.set_item_tooltip(popup.item_count - 1, TT_REBIND_COMPUTED)
+		rebind_added = true
+
+	var disc_will := (
+		_can_disconnect_binding_edge()
+		or _can_disconnect_computed_source()
+		or _can_disconnect_wire_edge()
+	)
+	var slot_will := (
+		_can_move_computed_source_up()
+		or _can_move_computed_source_down()
+		or _can_remove_computed_source_slot()
+	)
+	var ca_will := _can_create_and_assign_binding_edge()
+	if rebind_added and (disc_will or slot_will or ca_will):
+		popup.add_separator()
+
+	var disc_added := false
+	if _can_disconnect_binding_edge():
+		popup.add_item("Clear optional binding", UiReactDockExplainMenuIds._SEL_ACT_CLEAR_OPT_BINDING)
+		popup.set_item_tooltip(popup.item_count - 1, TT_CLEAR_BINDING)
+		disc_added = true
+	if _can_disconnect_computed_source():
+		popup.add_item("Remove computed dependency", UiReactDockExplainMenuIds._SEL_ACT_REMOVE_COMPUTED_DEP)
+		popup.set_item_tooltip(popup.item_count - 1, TT_REMOVE_COMPUTED)
+		disc_added = true
+	if _can_disconnect_wire_edge():
+		popup.add_item("Clear wire link", UiReactDockExplainMenuIds._SEL_ACT_CLEAR_WIRE_LINK)
+		popup.set_item_tooltip(popup.item_count - 1, TT_CLEAR_WIRE)
+		disc_added = true
+
+	if disc_added and slot_will:
+		popup.add_separator()
+
+	if _can_move_computed_source_up():
+		popup.add_item("Move source up", UiReactDockExplainMenuIds._SEL_ACT_MOVE_SRC_UP)
+		popup.set_item_tooltip(popup.item_count - 1, TT_MOVE_UP)
+	if _can_move_computed_source_down():
+		popup.add_item("Move source down", UiReactDockExplainMenuIds._SEL_ACT_MOVE_SRC_DOWN)
+		popup.set_item_tooltip(popup.item_count - 1, TT_MOVE_DOWN)
+	if _can_remove_computed_source_slot():
+		popup.add_item("Remove source slot", UiReactDockExplainMenuIds._SEL_ACT_REMOVE_SRC_SLOT)
+		popup.set_item_tooltip(popup.item_count - 1, TT_REMOVE_SLOT)
+
+	if ca_will:
+		if popup.item_count > 0:
+			popup.add_separator()
+		popup.add_item("Create & assign…", UiReactDockExplainMenuIds._SEL_ACT_CREATE_ASSIGN_BINDING)
+		popup.set_item_tooltip(popup.item_count - 1, TT_CREATE_ASSIGN)
+
+
+func _on_selection_action_id(id: int) -> void:
+	if id == UiReactDockExplainMenuIds._SEL_ACT_FOCUS_INSPECTOR:
+		_on_focus_inspector_pressed()
+		return
+	match id:
+		UiReactDockExplainMenuIds._SEL_ACT_COPY_DETAILS:
+			_on_copy_details_pressed()
+		_:
+			## Other root selection menu ids are handled by nested submenus (Node / Wire / Edge edit).
+			pass
+
+
+func _on_selection_node_submenu_id(_id: int) -> void:
+	## Node submenu only exposes nested "Create state & bind…"; flat item ids are not used here.
+	pass
+
+
+func _on_selection_wire_submenu_id(id: int) -> void:
+	var ns: int = _WireStackCatalogScript.stack_entries().size()
+	if id >= UiReactDockExplainMenuIds._SEL_ACT_WIRE_STACK_ADD_BASE and id < UiReactDockExplainMenuIds._SEL_ACT_WIRE_STACK_ADD_BASE + ns:
+		var sidx: int = id - UiReactDockExplainMenuIds._SEL_ACT_WIRE_STACK_ADD_BASE
+		if _wire_rules_section != null:
+			_wire_rules_section.append_stack_from_catalog_index(sidx)
+		return
+	var nw := _WireRuleCatalogScript.rule_script_entries().size()
+	if id == UiReactDockExplainMenuIds._SEL_ACT_WIRE_REFRESH_LIST:
+		if _wire_rules_section != null:
+			_wire_rules_section.refresh_from_host()
+		return
+	if id == UiReactDockExplainMenuIds._SEL_ACT_WIRE_COPY_RULE_REPORT:
+		if _wire_rules_section != null:
+			_wire_rules_section.copy_selected_report_to_clipboard()
+		return
+	if id >= UiReactDockExplainMenuIds._SEL_ACT_WIRE_ADD_BASE and id < UiReactDockExplainMenuIds._SEL_ACT_WIRE_ADD_BASE + nw:
+		var cidx := id - UiReactDockExplainMenuIds._SEL_ACT_WIRE_ADD_BASE
+		if _wire_rules_section != null:
+			_wire_rules_section.append_rule_from_catalog_index(cidx)
+
+
+func _on_selection_edge_edit_submenu_id(id: int) -> void:
+	match id:
+		UiReactDockExplainMenuIds._SEL_ACT_REBIND_BINDING:
+			_on_rebind_binding_pressed()
+		UiReactDockExplainMenuIds._SEL_ACT_REBIND_WIRE_IN:
+			_on_rebind_wire_in_pressed()
+		UiReactDockExplainMenuIds._SEL_ACT_REBIND_WIRE_OUT:
+			_on_rebind_wire_out_pressed()
+		UiReactDockExplainMenuIds._SEL_ACT_REBIND_COMPUTED_SRC:
+			_on_rebind_computed_source_pressed()
+		UiReactDockExplainMenuIds._SEL_ACT_CLEAR_OPT_BINDING:
+			_on_clear_optional_binding_pressed()
+		UiReactDockExplainMenuIds._SEL_ACT_REMOVE_COMPUTED_DEP:
+			_on_remove_computed_dependency_pressed()
+		UiReactDockExplainMenuIds._SEL_ACT_CLEAR_WIRE_LINK:
+			_on_clear_wire_link_pressed()
+		UiReactDockExplainMenuIds._SEL_ACT_MOVE_SRC_UP:
+			_on_move_computed_source_up_pressed()
+		UiReactDockExplainMenuIds._SEL_ACT_MOVE_SRC_DOWN:
+			_on_move_computed_source_down_pressed()
+		UiReactDockExplainMenuIds._SEL_ACT_REMOVE_SRC_SLOT:
+			_on_remove_computed_source_slot_pressed()
+		UiReactDockExplainMenuIds._SEL_ACT_CREATE_ASSIGN_BINDING:
+			_on_create_assign_binding_pressed()
+		_:
+			## Unknown edge-edit submenu id (defensive; menus are built from known constants only).
+			pass
+
+
+func _selection_edge_edit_action_count() -> int:
+	var n := 0
+	if _can_rebind_binding_edge():
+		n += 1
+	if _can_rebind_wire_endpoint(true):
+		n += 1
+	if _can_rebind_wire_endpoint(false):
+		n += 1
+	if _can_rebind_computed_source():
+		n += 1
+	if _can_disconnect_binding_edge():
+		n += 1
+	if _can_disconnect_computed_source():
+		n += 1
+	if _can_disconnect_wire_edge():
+		n += 1
+	if _can_move_computed_source_up():
+		n += 1
+	if _can_move_computed_source_down():
+		n += 1
+	if _can_remove_computed_source_slot():
+		n += 1
+	if _can_create_and_assign_binding_edge():
+		n += 1
+	return n
+
+
+func _append_single_edge_edit_action_to_menu(popup: PopupMenu) -> void:
+	const TT_REBIND_BINDING := (
+		"Pick another saved state file for this Inspector binding (you can undo). "
+		+ "For wire rows use Rebind wire input/output; for computed inputs use Rebind computed source or Shift-drag from the tail node."
+	)
+	const TT_REBIND_WIRE_IN := (
+		"Pick another state for this wire rule’s input slot (you can undo). Does not apply to pure computed edges."
+	)
+	const TT_REBIND_WIRE_OUT := (
+		"Pick another state for this wire rule’s output slot (you can undo). Does not apply to pure computed edges."
+	)
+	const TT_REBIND_COMPUTED := (
+		"Swap one input on the computed resource for another state (you can undo). "
+		+ "If the action stays disabled, click Refresh; you can also Shift-drag from the upstream node to a new target."
+	)
+	const TT_CLEAR_BINDING := "Clears an optional binding here; required bindings must be edited in the Inspector."
+	const TT_REMOVE_COMPUTED := "Removes one computed input slot (you can undo). Refresh the graph if the row looks stale."
+	const TT_CLEAR_WIRE := "Clears both ends of this wire link in one undo; both slots must already be filled."
+	const TT_MOVE_UP := "Moves this computed input one step earlier in the list (you can undo)."
+	const TT_MOVE_DOWN := "Moves this computed input one step later in the list (you can undo)."
+	const TT_REMOVE_SLOT := "Deletes this computed input index and packs the list (you can undo)."
+	const TT_CREATE_ASSIGN := "Creates a new matching state file and assigns it to an empty optional binding (you can undo)."
+
+	if _can_rebind_binding_edge():
+		popup.add_item("Rebind to resource…", UiReactDockExplainMenuIds._SEL_ACT_REBIND_BINDING)
+		popup.set_item_tooltip(popup.item_count - 1, TT_REBIND_BINDING)
+		return
+	if _can_rebind_wire_endpoint(true):
+		popup.add_item("Rebind wire input…", UiReactDockExplainMenuIds._SEL_ACT_REBIND_WIRE_IN)
+		popup.set_item_tooltip(popup.item_count - 1, TT_REBIND_WIRE_IN)
+		return
+	if _can_rebind_wire_endpoint(false):
+		popup.add_item("Rebind wire output…", UiReactDockExplainMenuIds._SEL_ACT_REBIND_WIRE_OUT)
+		popup.set_item_tooltip(popup.item_count - 1, TT_REBIND_WIRE_OUT)
+		return
+	if _can_rebind_computed_source():
+		popup.add_item("Rebind computed source…", UiReactDockExplainMenuIds._SEL_ACT_REBIND_COMPUTED_SRC)
+		popup.set_item_tooltip(popup.item_count - 1, TT_REBIND_COMPUTED)
+		return
+	if _can_disconnect_binding_edge():
+		popup.add_item("Clear optional binding", UiReactDockExplainMenuIds._SEL_ACT_CLEAR_OPT_BINDING)
+		popup.set_item_tooltip(popup.item_count - 1, TT_CLEAR_BINDING)
+		return
+	if _can_disconnect_computed_source():
+		popup.add_item("Remove computed dependency", UiReactDockExplainMenuIds._SEL_ACT_REMOVE_COMPUTED_DEP)
+		popup.set_item_tooltip(popup.item_count - 1, TT_REMOVE_COMPUTED)
+		return
+	if _can_disconnect_wire_edge():
+		popup.add_item("Clear wire link", UiReactDockExplainMenuIds._SEL_ACT_CLEAR_WIRE_LINK)
+		popup.set_item_tooltip(popup.item_count - 1, TT_CLEAR_WIRE)
+		return
+	if _can_move_computed_source_up():
+		popup.add_item("Move source up", UiReactDockExplainMenuIds._SEL_ACT_MOVE_SRC_UP)
+		popup.set_item_tooltip(popup.item_count - 1, TT_MOVE_UP)
+		return
+	if _can_move_computed_source_down():
+		popup.add_item("Move source down", UiReactDockExplainMenuIds._SEL_ACT_MOVE_SRC_DOWN)
+		popup.set_item_tooltip(popup.item_count - 1, TT_MOVE_DOWN)
+		return
+	if _can_remove_computed_source_slot():
+		popup.add_item("Remove source slot", UiReactDockExplainMenuIds._SEL_ACT_REMOVE_SRC_SLOT)
+		popup.set_item_tooltip(popup.item_count - 1, TT_REMOVE_SLOT)
+		return
+	if _can_create_and_assign_binding_edge():
+		popup.add_item("Create & assign…", UiReactDockExplainMenuIds._SEL_ACT_CREATE_ASSIGN_BINDING)
+		popup.set_item_tooltip(popup.item_count - 1, TT_CREATE_ASSIGN)
+
+
+func _sync_hidden_preset_option_index() -> void:
+	if _scope_preset_option == null:
+		return
+	var active: String = String(UiReactDockConfig.get_active_graph_scope_preset_name()).strip_edges()
+	_scope_preset_block_select = true
+	if active.is_empty() or active.to_lower() == "default":
+		_scope_preset_option.select(0)
+		_scope_preset_block_select = false
+		return
+	for i in range(_scope_preset_option.item_count):
+		if str(_scope_preset_option.get_item_metadata(i)) == active:
+			_scope_preset_option.select(i)
+			_scope_preset_block_select = false
+			return
+	_scope_preset_option.select(0)
+	_scope_preset_block_select = false
+
+
+func _apply_scope_preset_by_name(preset_name: String) -> void:
+	_rebuild_scope_preset_dropdown()
+	var name := preset_name.strip_edges()
+	UiReactDockConfig.set_active_graph_scope_preset_name(name)
+	if name.is_empty() or name.to_lower() == "default":
+		_apply_scope_dict_to_ui(_default_scope_dict())
+	else:
+		var found := false
+		for it: Variant in _scope_presets_cache:
+			if it is Dictionary:
+				var pd: Dictionary = _preset_from_variant(it)
+				if String(pd.get("name", "")) == name:
+					_apply_scope_dict_to_ui(pd)
+					found = true
+					break
+		if not found:
+			_apply_scope_dict_to_ui(_default_scope_dict())
+			UiReactDockConfig.set_active_graph_scope_preset_name("")
+	_sync_hidden_preset_option_index()
+	refresh()
+
+
+func _fill_canvas_view_popup(popup: PopupMenu) -> void:
+	popup.clear()
+	popup.add_item("Refresh", UiReactDockExplainMenuIds._CV_REFRESH)
+	popup.set_item_tooltip(popup.item_count - 1, "Rebuild the graph from the current scene selection and filters.")
+	popup.add_item("Fit view", UiReactDockExplainMenuIds._CV_FIT)
+	popup.set_item_tooltip(popup.item_count - 1, "Reset pan and zoom so the whole graph fits the view.")
+	popup.add_separator()
+	if _canvas_create_submenu_popup != null:
+		_fill_canvas_create_submenu(_canvas_create_submenu_popup)
+		popup.add_submenu_node_item("Create", _canvas_create_submenu_popup, UiReactDockExplainMenuIds._CV_SUB_CREATE_ROOT)
+	if _canvas_view_submenu_popup != null:
+		_fill_canvas_view_submenu(_canvas_view_submenu_popup)
+		popup.add_submenu_node_item("View", _canvas_view_submenu_popup, UiReactDockExplainMenuIds._CV_SUB_VIEW_ROOT)
+	if _canvas_scope_submenu_popup != null and _canvas_scope_presets_popup != null:
+		_fill_scope_submenu(_canvas_scope_submenu_popup, _canvas_scope_presets_popup)
+		popup.add_submenu_node_item("Scope", _canvas_scope_submenu_popup, UiReactDockExplainMenuIds._CV_SUB_SCOPE_ROOT)
+
+
+func _on_canvas_view_menu_id(id: int) -> void:
+	if _canvas_view_context_popup == null:
+		return
+	if id == UiReactDockExplainMenuIds._CV_REFRESH:
+		refresh()
+		return
+	if id == UiReactDockExplainMenuIds._CV_FIT:
+		_on_fit_pressed()
+		return
+
+
+func _fill_canvas_create_submenu(popup: PopupMenu) -> void:
+	popup.clear()
+	_canvas_create_state_names.clear()
+	var cnames: PackedStringArray = _GraphFactoryScript.factory_state_class_names()
+	for ci in range(cnames.size()):
+		var csn := String(cnames[ci])
+		popup.add_item("New %s…" % csn, UiReactDockExplainMenuIds._CV_CREATE_STATE_BASE + ci)
+		_canvas_create_state_names.append(csn)
+
+
+func _fill_canvas_view_submenu(popup: PopupMenu) -> void:
+	popup.clear()
+	popup.add_item("Full lists", UiReactDockExplainMenuIds._CV_TOGGLE_FULL_LISTS)
+	popup.set_item_tooltip(popup.item_count - 1, "Show full upstream/downstream lists in the details text.")
+	popup.set_item_as_checkable(popup.item_count - 1, true)
+	popup.set_item_checked(popup.item_count - 1, _cb_full_lists != null and _cb_full_lists.button_pressed)
+	popup.add_item("Show binding edges", UiReactDockExplainMenuIds._CV_TOGGLE_BINDING)
+	popup.set_item_tooltip(popup.item_count - 1, "Show or hide lines from states into control bindings.")
+	popup.set_item_as_checkable(popup.item_count - 1, true)
+	popup.set_item_checked(popup.item_count - 1, _cb_bind != null and _cb_bind.button_pressed)
+	popup.add_item("Show computed edges", UiReactDockExplainMenuIds._CV_TOGGLE_COMPUTED)
+	popup.set_item_tooltip(popup.item_count - 1, "Show or hide lines that feed computed resources.")
+	popup.set_item_as_checkable(popup.item_count - 1, true)
+	popup.set_item_checked(popup.item_count - 1, _cb_computed != null and _cb_computed.button_pressed)
+	popup.add_item("Show wire edges", UiReactDockExplainMenuIds._CV_TOGGLE_WIRE)
+	popup.set_item_tooltip(popup.item_count - 1, "Show or hide wire rule input/output lines.")
+	popup.set_item_as_checkable(popup.item_count - 1, true)
+	popup.set_item_checked(popup.item_count - 1, _cb_wire != null and _cb_wire.button_pressed)
+	popup.add_item("All edge labels", UiReactDockExplainMenuIds._CV_TOGGLE_EDGE_LABELS)
+	popup.set_item_tooltip(popup.item_count - 1, "Always show short labels on edges; the details pane still expands the active edge.")
+	popup.set_item_as_checkable(popup.item_count - 1, true)
+	popup.set_item_checked(popup.item_count - 1, _cb_edge_labels != null and _cb_edge_labels.button_pressed)
+	popup.add_item("Show legend", UiReactDockExplainMenuIds._CV_TOGGLE_LEGEND)
+	popup.set_item_tooltip(popup.item_count - 1, "Show the color key for nodes and edges above the graph.")
+	popup.set_item_as_checkable(popup.item_count - 1, true)
+	popup.set_item_checked(popup.item_count - 1, _legend_host != null and _legend_host.visible)
+
+
+func _on_canvas_create_submenu_id(id: int) -> void:
+	var ci := id - UiReactDockExplainMenuIds._CV_CREATE_STATE_BASE
+	if ci >= 0 and ci < _canvas_create_state_names.size():
+		_on_create_state_menu_id(ci)
+
+
+func _on_canvas_view_submenu_id(id: int) -> void:
+	if id == UiReactDockExplainMenuIds._CV_TOGGLE_FULL_LISTS:
+		if _cb_full_lists != null:
+			var on := not _cb_full_lists.button_pressed
+			_cb_full_lists.button_pressed = on
+			_on_full_lists_toggled(on)
+		return
+	if id == UiReactDockExplainMenuIds._CV_TOGGLE_BINDING:
+		if _cb_bind != null:
+			_cb_bind.button_pressed = not _cb_bind.button_pressed
+			_push_visual_filters()
+			refresh()
+		return
+	if id == UiReactDockExplainMenuIds._CV_TOGGLE_COMPUTED:
+		if _cb_computed != null:
+			_cb_computed.button_pressed = not _cb_computed.button_pressed
+			_push_visual_filters()
+			refresh()
+		return
+	if id == UiReactDockExplainMenuIds._CV_TOGGLE_WIRE:
+		if _cb_wire != null:
+			_cb_wire.button_pressed = not _cb_wire.button_pressed
+			_push_visual_filters()
+			refresh()
+		return
+	if id == UiReactDockExplainMenuIds._CV_TOGGLE_EDGE_LABELS:
+		if _cb_edge_labels != null:
+			_cb_edge_labels.button_pressed = not _cb_edge_labels.button_pressed
+			_push_visual_filters()
+			refresh()
+		return
+	if id == UiReactDockExplainMenuIds._CV_TOGGLE_LEGEND:
+		if _legend_host != null:
+			_legend_host.visible = not _legend_host.visible
+			UiReactDockConfig.save_ui_preference(
+				UiReactDockConfig.KEY_GRAPH_LEGEND_VISIBLE, _legend_host.visible
+			)
+		return
+
+
+func _resolve_selected_node_bind_targets() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if _plugin == null:
+		return out
+	if _selection_kind != UiReactDockExplainMenuIds._SEL_NODE or _graph_selected_node_id.is_empty():
+		return out
+	var host := _resolve_control_host_from_node(_graph_selected_node_id, {})
+	if host == null:
+		return out
+	var comp := UiReactScannerService.get_component_name_from_script(host.get_script() as Script)
+	if comp.is_empty():
+		return out
+	var bindings: Array = UiReactComponentRegistry.BINDINGS_BY_COMPONENT.get(comp, [])
+	for b: Variant in bindings:
+		if b is not Dictionary:
+			continue
+		var bd := b as Dictionary
+		var prop_sn := StringName(bd.get("property", &""))
+		if prop_sn == &"":
+			continue
+		if not UiReactGraphNewBindingService.binding_export_is_optional(comp, prop_sn):
+			continue
+		if host.get(prop_sn) != null:
+			continue
+		var kind := str(bd.get("kind", ""))
+		var expected := String(
+			UiReactBindingValidator._expected_binding_state_class(comp, prop_sn, kind, host)
+		)
+		if expected.is_empty() or not _GraphFactoryScript.is_factory_supported_class(expected):
+			continue
+		out.append(
+			{
+				"host_path": str(host.get_path()),
+				"component": comp,
+				"property": prop_sn,
+				"expected_class": StringName(expected),
+				"label": "%s (%s)" % [String(prop_sn), expected],
+			}
+		)
+	return out
+
+
+func _can_create_and_bind_from_selected_node() -> bool:
+	return _resolve_selected_node_bind_targets().size() > 0
+
+
+func _fill_selection_create_bind_submenu(popup: PopupMenu) -> void:
+	popup.clear()
+	_selection_create_bind_actions.clear()
+	var targets := _resolve_selected_node_bind_targets()
+	var classes: PackedStringArray = _GraphFactoryScript.factory_state_class_names()
+	for ti in range(targets.size()):
+		var tgt: Dictionary = targets[ti]
+		var tgt_label := String(tgt.get("label", "binding"))
+		var expected := String(tgt.get("expected_class", ""))
+		for ci in range(classes.size()):
+			var cls := String(classes[ci])
+			var item_text := "New %s…" % cls
+			if targets.size() > 1:
+				item_text = "%s: New %s…" % [tgt_label, cls]
+			var menu_id := UiReactDockExplainMenuIds._SEL_ACT_CREATE_BIND_BASE + _selection_create_bind_actions.size()
+			popup.add_item(item_text, menu_id)
+			var item_idx := popup.item_count - 1
+			popup.set_item_tooltip(
+				item_idx, "Create %s and assign to %s." % [cls, String(tgt.get("property", ""))]
+			)
+			if cls != expected:
+				popup.set_item_disabled(item_idx, true)
+				popup.set_item_tooltip(
+					item_idx, "Expected %s for %s." % [expected, String(tgt.get("property", ""))]
+				)
+			var payload: Dictionary = tgt.duplicate(true)
+			payload["class_name"] = cls
+			_selection_create_bind_actions.append(payload)
+
+
+func _on_selection_create_bind_submenu_id(id: int) -> void:
+	var ai := id - UiReactDockExplainMenuIds._SEL_ACT_CREATE_BIND_BASE
+	if ai < 0 or ai >= _selection_create_bind_actions.size():
+		return
+	var payload: Dictionary = _selection_create_bind_actions[ai]
+	var cls := String(payload.get("class_name", ""))
+	if cls.is_empty():
+		return
+	_create_assign_host_path = str(payload.get("host_path", ""))
+	_create_assign_prop = StringName(payload.get("property", &""))
+	_create_assign_component = String(payload.get("component", ""))
+	_create_assign_expected_class = StringName(payload.get("expected_class", &""))
+	_create_state_class_pending = cls
+	_create_and_assign_mode = true
+	_popup_create_state_save_dialog(true)
+
+
+func _on_canvas_view_menu_requested(at_local: Vector2) -> void:
+	if _canvas_view_context_popup == null or _graph_view == null:
+		return
+	_fill_canvas_view_popup(_canvas_view_context_popup)
+	var gp: Vector2 = _graph_view.get_screen_transform() * at_local
+	_canvas_view_context_popup.position = Vector2i(gp)
+	_canvas_view_context_popup.popup()
+
+
+func _on_graph_context_menu_requested(at_local: Vector2) -> void:
+	if _selection_actions_context_popup == null or _graph_view == null:
+		return
+	_fill_selection_actions_popup(_selection_actions_context_popup)
+	var gp: Vector2 = _graph_view.get_screen_transform() * at_local
+	_selection_actions_context_popup.position = Vector2i(gp)
+	_selection_actions_context_popup.popup()
+
+
+func _can_disconnect_binding_edge() -> bool:
+	if not _can_rebind_binding_edge():
+		return false
+	var ei := _plugin.get_editor_interface()
+	var root := ei.get_edited_scene_root()
+	if root == null:
+		return false
+	var edges: Array = _last_layout.get(&"draw_edges", []) as Array
+	var idx := _graph_selected_edge_index
+	if idx < 0 or idx >= edges.size():
+		return false
+	var ev: Variant = edges[idx]
+	if ev is not Dictionary:
+		return false
+	var ed: Dictionary = ev as Dictionary
+	var hp := str(ed.get(&"host_path", ""))
+	var bp := str(ed.get(&"binding_property", ""))
+	if bp.is_empty():
+		bp = str(ed.get(&"label", ""))
+	if hp.is_empty() or bp.is_empty():
+		return false
+	if not root.has_node(NodePath(hp)):
+		return false
+	var n: Node = root.get_node(NodePath(hp))
+	if not (n is Control):
+		return false
+	var host := n as Control
+	var comp := UiReactScannerService.get_component_name_from_script(host.get_script() as Script)
+	if comp.is_empty():
+		return false
+	var prop_sn := StringName(bp)
+	if not UiReactGraphNewBindingService.binding_export_is_optional(comp, prop_sn):
+		return false
+	return host.get(prop_sn) != null
+
+
+func _can_disconnect_computed_source() -> bool:
+	return _can_rebind_computed_source()
+
+
+func _can_disconnect_wire_edge() -> bool:
+	if not _can_rebind_wire_endpoint(true) or not _can_rebind_wire_endpoint(false):
+		return false
+	var ei := _plugin.get_editor_interface()
+	var root := ei.get_edited_scene_root()
+	if root == null:
+		return false
+	var edges: Array = _last_layout.get(&"draw_edges", []) as Array
+	var idx := _graph_selected_edge_index
+	if idx < 0 or idx >= edges.size():
+		return false
+	var ev: Variant = edges[idx]
+	if ev is not Dictionary:
+		return false
+	var ed: Dictionary = ev as Dictionary
+	var wh := str(ed.get(&"wire_host_path", ""))
+	var wi := int(ed.get(&"wire_rule_index", -1))
+	var win := str(ed.get(&"wire_in_property", ""))
+	var wout := str(ed.get(&"wire_out_property", ""))
+	if wh.is_empty() or not root.has_node(NodePath(wh)):
+		return false
+	var host: Node = root.get_node(NodePath(wh))
+	if not (host is Control):
+		return false
+	var arr := _WireGraphEditScript.duplicate_wire_rules_array(host as Control)
+	if wi < 0 or wi >= arr.size():
+		return false
+	var rule: Variant = arr[wi]
+	if rule == null or not (rule is UiReactWireRule):
+		return false
+	var ip := StringName(win)
+	var op := StringName(wout)
+	if not ip in rule or not op in rule:
+		return false
+	return (rule as Object).get(ip) != null and (rule as Object).get(op) != null
+
+
+func _current_computed_edge_sources_size() -> int:
+	if not _can_rebind_computed_source():
+		return -1
+	var ei := _plugin.get_editor_interface()
+	var root := ei.get_edited_scene_root()
+	if root == null:
+		return -1
+	var edges: Array = _last_layout.get(&"draw_edges", []) as Array
+	var idx := _graph_selected_edge_index
+	if idx < 0 or idx >= edges.size():
+		return -1
+	var ed: Dictionary = edges[idx] as Dictionary
+	var hp := str(ed.get(&"host_path", ""))
+	var ctx := str(ed.get(&"computed_context", ""))
+	if hp.is_empty() or not root.has_node(NodePath(hp)):
+		return -1
+	var n: Node = root.get_node(NodePath(hp))
+	if not (n is Control):
+		return -1
+	var c: Variant = _ComputedRebindScript.try_resolve_computed(n as Control, ctx)
+	if c == null:
+		return -1
+	var raw: Variant = c.get(&"sources")
+	if typeof(raw) != TYPE_ARRAY:
+		return -1
+	return (raw as Array).size()
+
+
+func _can_move_computed_source_up() -> bool:
+	if not _can_rebind_computed_source():
+		return false
+	var si := _computed_source_index_from_selection()
+	return si > 0
+
+
+func _can_move_computed_source_down() -> bool:
+	if not _can_rebind_computed_source():
+		return false
+	var si := _computed_source_index_from_selection()
+	var sz := _current_computed_edge_sources_size()
+	return si >= 0 and sz > 0 and si < sz - 1
+
+
+func _can_remove_computed_source_slot() -> bool:
+	return _can_rebind_computed_source() and _current_computed_edge_sources_size() > 0
+
+
+func _computed_source_index_from_selection() -> int:
+	if _selection_kind != UiReactDockExplainMenuIds._SEL_EDGE or _graph_selected_edge_index < 0:
+		return -1
+	var edges: Array = _last_layout.get(&"draw_edges", []) as Array
+	var idx := _graph_selected_edge_index
+	if idx < 0 or idx >= edges.size():
+		return -1
+	var ed: Dictionary = edges[idx] as Dictionary
+	return int(ed.get(&"computed_source_index", -1))
+
+
+func _attempt_graph_edge_disconnect() -> void:
+	if _plugin == null or _actions == null:
+		return
+	if _selection_kind != UiReactDockExplainMenuIds._SEL_EDGE or _graph_selected_edge_index < 0:
+		return
+	var root := _plugin.get_editor_interface().get_edited_scene_root()
+	if root == null:
+		return
+	var edges: Array = _last_layout.get(&"draw_edges", []) as Array
+	var idx := _graph_selected_edge_index
+	if idx < 0 or idx >= edges.size():
+		return
+	var ev: Variant = edges[idx]
+	if ev is not Dictionary:
+		return
+	var ed: Dictionary = ev as Dictionary
+	var k := int(ed.get(&"kind", -1))
+	var committed := false
+	if k == _SnapScript.EdgeKind.BINDING:
+		if not _can_disconnect_binding_edge():
+			push_warning(
+				"Ui React: graph delete only clears optional bindings that already have a resource. Use the Inspector for required slots, or pick a binding edge."
+			)
+			return
+		var hp := str(ed.get(&"host_path", ""))
+		var bp := str(ed.get(&"binding_property", ""))
+		if bp.is_empty():
+			bp = str(ed.get(&"label", ""))
+		var host_n: Node = root.get_node(NodePath(hp))
+		var comp := UiReactScannerService.get_component_name_from_script((host_n as Control).get_script() as Script)
+		committed = UiReactGraphNewBindingService.try_commit_clear_binding_export(
+			host_n as Control, comp, StringName(bp), _actions
+		)
+	elif k == _SnapScript.EdgeKind.COMPUTED_SOURCE:
+		if not _can_disconnect_computed_source():
+			push_warning(
+				"Ui React: cannot remove this computed source from the graph right now. Click Rescan, confirm the host node still exists, then try again."
+			)
+			return
+		var hp_c := str(ed.get(&"host_path", ""))
+		var ctx := str(ed.get(&"computed_context", ""))
+		var csi := int(ed.get(&"computed_source_index", -1))
+		var host_c: Node = root.get_node(NodePath(hp_c))
+		committed = _ComputedRebindScript.try_commit_clear_source(host_c as Control, ctx, csi, _actions)
+	elif k == _SnapScript.EdgeKind.WIRE_FLOW:
+		if not _can_disconnect_wire_edge():
+			push_warning(
+				"Ui React: graph delete for a wire link needs both ends filled on that edge. Otherwise clear the slots in the Inspector on the Wire rules row."
+			)
+			return
+		var wh := str(ed.get(&"wire_host_path", ""))
+		var wi := int(ed.get(&"wire_rule_index", -1))
+		var win := StringName(str(ed.get(&"wire_in_property", "")))
+		var wout := StringName(str(ed.get(&"wire_out_property", "")))
+		var host_w: Node = root.get_node(NodePath(wh))
+		committed = _WireGraphEditScript.try_commit_wire_edge_disconnect(
+			host_w as Control, wi, win, wout, _actions
+		)
+	else:
+		push_warning(
+			"Ui React: Delete from the graph only works on binding, computed-source, or wire-flow edges. Pick one of those edge types first."
+		)
+		return
+	if not committed:
+		return
+	if _request_dock_refresh.is_valid():
+		_request_dock_refresh.call()
+	refresh()
+
+
+func _on_clear_optional_binding_pressed() -> void:
+	if _selection_kind != UiReactDockExplainMenuIds._SEL_EDGE or _last_edge_kind != _SnapScript.EdgeKind.BINDING:
+		return
+	_attempt_graph_edge_disconnect()
+
+
+func _on_remove_computed_dependency_pressed() -> void:
+	if _selection_kind != UiReactDockExplainMenuIds._SEL_EDGE or _last_edge_kind != _SnapScript.EdgeKind.COMPUTED_SOURCE:
+		return
+	_attempt_graph_edge_disconnect()
+
+
+func _on_clear_wire_link_pressed() -> void:
+	if _selection_kind != UiReactDockExplainMenuIds._SEL_EDGE or _last_edge_kind != _SnapScript.EdgeKind.WIRE_FLOW:
+		return
+	_attempt_graph_edge_disconnect()
+
+
+func _on_move_computed_source_up_pressed() -> void:
+	if _plugin == null or _actions == null:
+		return
+	if not _can_move_computed_source_up():
+		return
+	var root := _plugin.get_editor_interface().get_edited_scene_root()
+	if root == null:
+		return
+	var edges: Array = _last_layout.get(&"draw_edges", []) as Array
+	var idx := _graph_selected_edge_index
+	if idx < 0 or idx >= edges.size():
+		return
+	var ed: Dictionary = edges[idx] as Dictionary
+	var hp := str(ed.get(&"host_path", ""))
+	var ctx := str(ed.get(&"computed_context", ""))
+	var si := int(ed.get(&"computed_source_index", -1))
+	var host_n: Node = root.get_node(NodePath(hp))
+	if not _ComputedRebindScript.try_commit_swap_sources(
+		host_n as Control, ctx, si, si - 1, _actions
+	):
+		return
+	if _request_dock_refresh.is_valid():
+		_request_dock_refresh.call()
+	refresh()
+
+
+func _on_move_computed_source_down_pressed() -> void:
+	if _plugin == null or _actions == null:
+		return
+	if not _can_move_computed_source_down():
+		return
+	var root := _plugin.get_editor_interface().get_edited_scene_root()
+	if root == null:
+		return
+	var edges: Array = _last_layout.get(&"draw_edges", []) as Array
+	var idx := _graph_selected_edge_index
+	if idx < 0 or idx >= edges.size():
+		return
+	var ed: Dictionary = edges[idx] as Dictionary
+	var hp := str(ed.get(&"host_path", ""))
+	var ctx := str(ed.get(&"computed_context", ""))
+	var si := int(ed.get(&"computed_source_index", -1))
+	var host_n: Node = root.get_node(NodePath(hp))
+	if not _ComputedRebindScript.try_commit_swap_sources(
+		host_n as Control, ctx, si, si + 1, _actions
+	):
+		return
+	if _request_dock_refresh.is_valid():
+		_request_dock_refresh.call()
+	refresh()
+
+
+func _on_remove_computed_source_slot_pressed() -> void:
+	if _plugin == null or _actions == null:
+		return
+	if not _can_remove_computed_source_slot():
+		return
+	var root := _plugin.get_editor_interface().get_edited_scene_root()
+	if root == null:
+		return
+	var edges: Array = _last_layout.get(&"draw_edges", []) as Array
+	var idx := _graph_selected_edge_index
+	if idx < 0 or idx >= edges.size():
+		return
+	var ed: Dictionary = edges[idx] as Dictionary
+	var hp := str(ed.get(&"host_path", ""))
+	var ctx := str(ed.get(&"computed_context", ""))
+	var si := int(ed.get(&"computed_source_index", -1))
+	var host_n: Node = root.get_node(NodePath(hp))
+	if not _ComputedRebindScript.try_commit_remove_source_at(
+		host_n as Control, ctx, si, _actions
+	):
+		return
+	if _request_dock_refresh.is_valid():
+		_request_dock_refresh.call()
+	refresh()
+
+
+func _edge_allows_binding_rebind(ed: Dictionary, root: Node) -> bool:
+	if root == null:
+		return false
+	var hp := str(ed.get(&"host_path", ""))
+	var bp := str(ed.get(&"binding_property", ""))
+	if bp.is_empty():
+		bp = str(ed.get(&"label", ""))
+	if hp.is_empty() or bp.is_empty():
+		return false
+	if not root.has_node(NodePath(hp)):
+		return false
+	var n: Node = root.get_node(NodePath(hp))
+	if not (n is Control):
+		return false
+	return StringName(bp) in n
+
+
+func _edge_allows_wire_rebind(ed: Dictionary, root: Node, for_input: bool) -> bool:
+	if root == null:
+		return false
+	var wh := str(ed.get(&"wire_host_path", ""))
+	var wi := int(ed.get(&"wire_rule_index", -1))
+	var win := str(ed.get(&"wire_in_property", ""))
+	var wout := str(ed.get(&"wire_out_property", ""))
+	var prop_str := win if for_input else wout
+	if wh.is_empty() or wi < 0 or prop_str.is_empty():
+		return false
+	if not root.has_node(NodePath(wh)):
+		return false
+	var host: Node = root.get_node(NodePath(wh))
+	if not (host is Control):
+		return false
+	var ctl := host as Control
+	if not (&"wire_rules" in ctl):
+		return false
+	var wr: Variant = ctl.get(&"wire_rules")
+	if wr == null:
+		return false
+	var arr: Array = wr as Array if wr is Array else []
+	if wi >= arr.size():
+		return false
+	var rule_var: Variant = arr[wi]
+	if rule_var == null or not (rule_var is UiReactWireRule):
+		return false
+	var rule := rule_var as UiReactWireRule
+	return StringName(prop_str) in rule
+
+
+func _edge_allows_computed_rebind(ed: Dictionary, root: Node) -> bool:
+	if root == null:
+		return false
+	var cc := str(ed.get(&"computed_context", ""))
+	var hp := str(ed.get(&"host_path", ""))
+	var si := int(ed.get(&"computed_source_index", -1))
+	if cc.is_empty() or hp.is_empty() or si < 0:
+		return false
+	if not root.has_node(NodePath(hp)):
+		return false
+	var n: Node = root.get_node(NodePath(hp))
+	if not (n is Control):
+		return false
+	var c: Variant = _ComputedRebindScript.try_resolve_computed(n as Control, cc)
+	if c == null:
+		return false
+	var raw: Variant = c.get(&"sources")
+	if typeof(raw) != TYPE_ARRAY:
+		return false
+	var arr: Array = raw as Array
+	return si < arr.size()
+
+
+func _can_rebind_binding_edge() -> bool:
+	if _plugin == null or _actions == null:
+		return false
+	if _selection_kind != UiReactDockExplainMenuIds._SEL_EDGE or _last_edge_kind != _SnapScript.EdgeKind.BINDING:
+		return false
+	var ei := _plugin.get_editor_interface()
+	var root := ei.get_edited_scene_root()
+	if root == null:
+		return false
+	var edges: Array = _last_layout.get(&"draw_edges", []) as Array
+	var idx := _graph_selected_edge_index
+	if idx < 0 or idx >= edges.size():
+		return false
+	var ev: Variant = edges[idx]
+	if ev is not Dictionary:
+		return false
+	return _edge_allows_binding_rebind(ev as Dictionary, root)
+
+
+func _can_rebind_wire_endpoint(for_input: bool) -> bool:
+	if _plugin == null or _actions == null:
+		return false
+	if _selection_kind != UiReactDockExplainMenuIds._SEL_EDGE or _last_edge_kind != _SnapScript.EdgeKind.WIRE_FLOW:
+		return false
+	var ei := _plugin.get_editor_interface()
+	var root := ei.get_edited_scene_root()
+	if root == null:
+		return false
+	var edges: Array = _last_layout.get(&"draw_edges", []) as Array
+	var idx := _graph_selected_edge_index
+	if idx < 0 or idx >= edges.size():
+		return false
+	var ev: Variant = edges[idx]
+	if ev is not Dictionary:
+		return false
+	return _edge_allows_wire_rebind(ev as Dictionary, root, for_input)
+
+
+func _can_rebind_computed_source() -> bool:
+	if _plugin == null or _actions == null:
+		return false
+	if _selection_kind != UiReactDockExplainMenuIds._SEL_EDGE or _last_edge_kind != _SnapScript.EdgeKind.COMPUTED_SOURCE:
+		return false
+	var ei := _plugin.get_editor_interface()
+	var root := ei.get_edited_scene_root()
+	if root == null:
+		return false
+	var edges: Array = _last_layout.get(&"draw_edges", []) as Array
+	var idx := _graph_selected_edge_index
+	if idx < 0 or idx >= edges.size():
+		return false
+	var ev: Variant = edges[idx]
+	if ev is not Dictionary:
+		return false
+	return _edge_allows_computed_rebind(ev as Dictionary, root)
+
+
+func _reconnect_can_start(edge_idx: int, node_id: String) -> bool:
+	if _plugin == null or _actions == null:
+		return false
+	var ei := _plugin.get_editor_interface()
+	var root := ei.get_edited_scene_root()
+	if root == null:
+		return false
+	var edges: Array = _last_layout.get(&"draw_edges", []) as Array
+	if edge_idx < 0 or edge_idx >= edges.size():
+		return false
+	var ev: Variant = edges[edge_idx]
+	if ev is not Dictionary:
+		return false
+	var ed: Dictionary = ev as Dictionary
+	var k := int(ed.get(&"kind", -1))
+	if k == _SnapScript.EdgeKind.BINDING:
+		return node_id == str(ed.get(&"from_id", "")) and _edge_allows_binding_rebind(ed, root)
+	if k == _SnapScript.EdgeKind.COMPUTED_SOURCE:
+		return node_id == str(ed.get(&"from_id", "")) and _edge_allows_computed_rebind(ed, root)
+	if k == _SnapScript.EdgeKind.WIRE_FLOW:
+		var fid := str(ed.get(&"from_id", ""))
+		var tid := str(ed.get(&"to_id", ""))
+		if node_id == fid:
+			return _edge_allows_wire_rebind(ed, root, true)
+		if node_id == tid:
+			return _edge_allows_wire_rebind(ed, root, false)
+	return false
+
+
+func _reconnect_can_start_cb(edge_idx: int, node_id: String) -> bool:
+	return _reconnect_can_start(edge_idx, node_id)
+
+
+func _reconnect_is_valid_drop(edge_idx: int, origin_id: String, target_id: String) -> bool:
+	if origin_id == target_id or target_id.is_empty():
+		return false
+	if _plugin == null:
+		return false
+	var ei := _plugin.get_editor_interface()
+	var root := ei.get_edited_scene_root()
+	if root == null:
+		return false
+	var nb: Dictionary = _last_layout.get(&"node_by_id", {}) as Dictionary
+	var centers: Dictionary = _last_layout.get(&"node_centers", {}) as Dictionary
+	if not nb.has(target_id) or not centers.has(target_id):
+		return false
+	var td: Dictionary = nb[target_id] as Dictionary
+	var nk := int(td.get(&"kind", -1))
+	if nk != _SnapScript.NodeKind.UI_STATE and nk != _SnapScript.NodeKind.UI_COMPUTED:
+		return false
+	var new_st: UiState = _ResolverScript.try_resolve_uistate(root, target_id, nb)
+	var old_st: UiState = _ResolverScript.try_resolve_uistate(root, origin_id, nb)
+	if new_st == null or old_st == null:
+		return false
+	if new_st == old_st:
+		return false
+	return true
+
+
+func _reconnect_is_valid_target_cb(edge_idx: int, origin_id: String, target_id: String) -> bool:
+	return _reconnect_is_valid_drop(edge_idx, origin_id, target_id)
+
+
+func _newlink_can_start_cb(node_id: String) -> bool:
+	return _newlink_can_start(node_id)
+
+
+func _newlink_can_start(node_id: String) -> bool:
+	if _plugin == null or _actions == null:
+		return false
+	var root := _plugin.get_editor_interface().get_edited_scene_root()
+	if root == null:
+		return false
+	var nb: Dictionary = _last_layout.get(&"node_by_id", {}) as Dictionary
+	if not nb.has(node_id):
+		return false
+	var d: Dictionary = nb[node_id] as Dictionary
+	var nk := int(d.get(&"kind", -1))
+	if nk != _SnapScript.NodeKind.UI_STATE and nk != _SnapScript.NodeKind.UI_COMPUTED:
+		return false
+	return _ResolverScript.try_resolve_uistate(root, node_id, nb) != null
+
+
+func _newlink_is_valid_drop_cb(donor_id: String, target_id: String) -> bool:
+	return _newlink_is_valid_drop(donor_id, target_id)
+
+
+func _newlink_is_valid_drop(donor_id: String, target_id: String) -> bool:
+	if donor_id == target_id or donor_id.is_empty() or target_id.is_empty():
+		return false
+	if _plugin == null:
+		return false
+	var root := _plugin.get_editor_interface().get_edited_scene_root()
+	if root == null:
+		return false
+	var nb: Dictionary = _last_layout.get(&"node_by_id", {}) as Dictionary
+	var centers: Dictionary = _last_layout.get(&"node_centers", {}) as Dictionary
+	if not nb.has(donor_id) or not nb.has(target_id):
+		return false
+	if not centers.has(target_id):
+		return false
+	var donor_st: UiState = _ResolverScript.try_resolve_uistate(root, donor_id, nb)
+	if donor_st == null:
+		return false
+	var td: Dictionary = nb[target_id] as Dictionary
+	var tk := int(td.get(&"kind", -1))
+	if tk == _SnapScript.NodeKind.CONTROL:
+		var cp := str(td.get(&"control_path", ""))
+		if cp.is_empty() or not root.has_node(NodePath(cp)):
+			return false
+		var n: Node = root.get_node(NodePath(cp))
+		if not (n is Control):
+			return false
+		var host := n as Control
+		var comp := UiReactScannerService.get_component_name_from_script(host.get_script() as Script)
+		if comp.is_empty():
+			return false
+		var dd: Dictionary = nb[donor_id] as Dictionary
+		var dk := int(dd.get(&"kind", -1))
+		var cands: Array = _NewBindingScript.list_assignable_empty_exports(host, comp, donor_st)
+		var has_bind := not cands.is_empty()
+		var has_wire := (&"wire_rules" in host) and dk == _SnapScript.NodeKind.UI_STATE
+		return has_bind or has_wire
+	if tk == _SnapScript.NodeKind.UI_COMPUTED:
+		var ehp := str(td.get(&"embedded_host_path", ""))
+		var ctx := str(td.get(&"embedded_context", ""))
+		if not ehp.is_empty() and not ctx.is_empty():
+			if not root.has_node(NodePath(ehp)):
+				return false
+			var hn: Node = root.get_node(NodePath(ehp))
+			if not (hn is Control):
+				return false
+			return _ComputedRebindScript.can_fill_or_append_computed_sources(hn as Control, ctx)
+		var fp := str(td.get(&"state_file_path", ""))
+		if fp.is_empty():
+			return false
+		var res: Resource = load(fp)
+		if not (res is UiComputedStringState or res is UiComputedBoolState):
+			return false
+		var mounts: Array = _ComputedMountsScript.mounts_for_computed_resource(root, res)
+		if mounts.is_empty():
+			return false
+		var m0: Dictionary = mounts[0]
+		var mhp := str(m0.get(&"host_path", ""))
+		var mctx := str(m0.get(&"computed_context", ""))
+		if mhp.is_empty() or mctx.is_empty() or not root.has_node(NodePath(mhp)):
+			return false
+		var h0: Node = root.get_node(NodePath(mhp))
+		if not (h0 is Control):
+			return false
+		return _ComputedRebindScript.can_fill_or_append_computed_sources(h0 as Control, mctx)
+	return false
+
+
+func _ensure_newlink_binding_popup() -> PopupMenu:
+	if _newlink_binding_popup != null:
+		return _newlink_binding_popup
+	_newlink_binding_popup = PopupMenu.new()
+	var bc: Control = _plugin.get_editor_interface().get_base_control()
+	bc.add_child(_newlink_binding_popup)
+	_explain_signal_scope.connect_bound(_newlink_binding_popup.id_pressed, _on_newlink_binding_menu_id)
+	return _newlink_binding_popup
+
+
+func _open_newlink_binding_picker(host: Control, component: String, donor: UiState, candidates: Array) -> void:
+	_newlink_pick_host = host
+	_newlink_pick_component = component
+	_newlink_pick_donor = donor
+	_newlink_pick_candidates = candidates.duplicate()
+	var m := _ensure_newlink_binding_popup()
+	m.clear()
+	for i: int in range(_newlink_pick_candidates.size()):
+		var row: Variant = _newlink_pick_candidates[i]
+		var lab := str((row as Dictionary).get(&"label", ""))
+		m.add_item("Create binding: %s" % lab, i)
+	var mp: Vector2i = DisplayServer.mouse_get_position()
+	m.position = mp
+	m.popup()
+
+
+func _on_newlink_binding_menu_id(menu_id: int) -> void:
+	if _newlink_pick_host == null or _newlink_pick_donor == null:
+		return
+	if menu_id < 0 or menu_id >= _newlink_pick_candidates.size():
+		return
+	var row: Dictionary = _newlink_pick_candidates[menu_id] as Dictionary
+	var prop: StringName = row[&"property"] as StringName
+	if not _NewBindingScript.try_commit_assign(
+		_newlink_pick_host, _newlink_pick_component, prop, _newlink_pick_donor, _actions
+	):
+		_newlink_pick_host = null
+		_newlink_pick_donor = null
+		_newlink_pick_candidates.clear()
+		return
+	if _request_dock_refresh.is_valid():
+		_request_dock_refresh.call()
+	refresh()
+	_newlink_pick_host = null
+	_newlink_pick_donor = null
+	_newlink_pick_candidates.clear()
+
+
+func _on_graph_newlink_drag_ended(donor_id: String, target_id: String) -> void:
+	if _plugin == null or _actions == null or donor_id.is_empty() or target_id.is_empty():
+		return
+	if not _newlink_is_valid_drop(donor_id, target_id):
+		return
+	var root := _plugin.get_editor_interface().get_edited_scene_root()
+	if root == null:
+		return
+	var nb: Dictionary = _last_layout.get(&"node_by_id", {}) as Dictionary
+	var donor_st: UiState = _ResolverScript.try_resolve_uistate(root, donor_id, nb)
+	if donor_st == null:
+		return
+	var td: Dictionary = nb[target_id] as Dictionary
+	var tk := int(td.get(&"kind", -1))
+	var committed := false
+	if tk == _SnapScript.NodeKind.CONTROL:
+		var cp := str(td.get(&"control_path", ""))
+		if cp.is_empty() or not root.has_node(NodePath(cp)):
+			return
+		var n: Node = root.get_node(NodePath(cp))
+		if not (n is Control):
+			return
+		var host := n as Control
+		var comp := UiReactScannerService.get_component_name_from_script(host.get_script() as Script)
+		var dd: Dictionary = nb[donor_id] as Dictionary
+		var dk := int(dd.get(&"kind", -1))
+		var cands: Array = _NewBindingScript.list_assignable_empty_exports(host, comp, donor_st)
+		var has_bind := not cands.is_empty()
+		var has_wire := (&"wire_rules" in host) and dk == _SnapScript.NodeKind.UI_STATE
+		if has_bind and has_wire:
+			_open_newlink_mixed_popup(host, comp, donor_st, cands)
+			return
+		if has_bind:
+			if cands.size() == 1:
+				var prop: StringName = (cands[0] as Dictionary)[&"property"] as StringName
+				committed = _NewBindingScript.try_commit_assign(host, comp, prop, donor_st, _actions)
+			else:
+				_open_newlink_binding_picker(host, comp, donor_st, cands)
+				return
+		elif has_wire:
+			_open_newlink_wire_rules_only_popup(host, donor_st)
+			return
+		else:
+			push_warning(
+				"Ui React: this control has no empty binding slot and no wire rule that can take that state. Try another target node or add a wire rule template."
+			)
+			return
+	elif tk == _SnapScript.NodeKind.UI_COMPUTED:
+		var ehp := str(td.get(&"embedded_host_path", ""))
+		var ctx := str(td.get(&"embedded_context", ""))
+		if not ehp.is_empty() and not ctx.is_empty():
+			if not root.has_node(NodePath(ehp)):
+				return
+			var hn: Node = root.get_node(NodePath(ehp))
+			if not (hn is Control):
+				return
+			committed = _ComputedRebindScript.try_commit_append_or_fill_source(
+				hn as Control, ctx, donor_st, _actions
+			)
+		else:
+			var fp := str(td.get(&"state_file_path", ""))
+			if fp.is_empty():
+				push_warning(
+					"Ui React: that computed node has no scene path to edit. Open the owning .tres or bind the computed on a control in this scene."
+				)
+				return
+			var res: Resource = load(fp)
+			if not (res is UiComputedStringState or res is UiComputedBoolState):
+				return
+			var mounts: Array = _ComputedMountsScript.mounts_for_computed_resource(
+				root, res as Resource
+			)
+			if mounts.is_empty():
+				push_warning(
+					"Ui React: that file-backed computed is not used in this scene yet. Assign it on a control binding or open its .tres, then try the link again."
+				)
+				return
+			if mounts.size() == 1:
+				committed = _commit_newlink_computed_append_to_mount(
+					root, mounts[0] as Dictionary, donor_st
+				)
+			else:
+				_open_newlink_computed_mount_picker(root, donor_st, mounts)
+				return
+	if not committed:
+		return
+	if _request_dock_refresh.is_valid():
+		_request_dock_refresh.call()
+	refresh()
+
+
+func _commit_newlink_computed_append_to_mount(
+	root: Node, mount: Dictionary, donor_st: UiState
+) -> bool:
+	var mhp := str(mount.get(&"host_path", ""))
+	var mctx := str(mount.get(&"computed_context", ""))
+	if mhp.is_empty() or mctx.is_empty() or not root.has_node(NodePath(mhp)):
+		return false
+	var host_n: Node = root.get_node(NodePath(mhp))
+	if not (host_n is Control):
+		return false
+	var host := host_n as Control
+	var prop := _ComputedMountsScript.bind_prop_from_context(mctx)
+	if prop != &"":
+		var cur: Variant = host.get(prop)
+		if cur is Resource and not (cur as Resource).resource_path.is_empty():
+			if not _ComputedMountsScript.try_commit_make_computed_unique_at_bind(
+				host, prop, _actions
+			):
+				return false
+	return _ComputedRebindScript.try_commit_append_or_fill_source(host, mctx, donor_st, _actions)
+
+
+func _ensure_newlink_mixed_popup() -> PopupMenu:
+	if _newlink_mixed_popup != null:
+		return _newlink_mixed_popup
+	_newlink_mixed_popup = PopupMenu.new()
+	var bc: Control = _plugin.get_editor_interface().get_base_control()
+	bc.add_child(_newlink_mixed_popup)
+	_explain_signal_scope.connect_bound(_newlink_mixed_popup.id_pressed, _on_newlink_mixed_menu_id)
+	return _newlink_mixed_popup
+
+
+func _ensure_newlink_no_wire_dialog() -> AcceptDialog:
+	if _newlink_no_wire_dialog != null:
+		return _newlink_no_wire_dialog
+	_newlink_no_wire_dialog = AcceptDialog.new()
+	_newlink_no_wire_dialog.title = "No compatible wire rules"
+	_newlink_no_wire_dialog.dialog_text = (
+		"No wire rule templates accept this state on the first input export. "
+		+ "Try a different donor state or add a rule from the graph context menu."
+	)
+	add_child(_newlink_no_wire_dialog)
+	return _newlink_no_wire_dialog
+
+
+func _show_newlink_no_wire_rules_dialog() -> void:
+	var d := _ensure_newlink_no_wire_dialog()
+	d.popup_centered()
+
+
+func _open_newlink_mixed_popup(host: Control, component: String, donor: UiState, cands: Array) -> void:
+	_newlink_mixed_host = host
+	_newlink_mixed_component = component
+	_newlink_mixed_donor_st = donor
+	_newlink_mixed_binding_cands = cands.duplicate()
+	var filtered: PackedInt32Array = _WireGraphEditScript.filter_rule_template_indices_for_donor(donor)
+	_newlink_wire_filter_indices = filtered
+	var m := _ensure_newlink_mixed_popup()
+	m.clear()
+	var id := 0
+	for row in cands:
+		var lab := str((row as Dictionary).get(&"label", ""))
+		m.add_item("Create binding: %s" % lab, id)
+		id += 1
+	var entries := _WireRuleCatalogScript.rule_script_entries()
+	if filtered.is_empty():
+		if cands.is_empty():
+			_show_newlink_no_wire_rules_dialog()
+			return
+	else:
+		if not cands.is_empty():
+			m.add_separator()
+		var wire_base := id
+		for k: int in range(filtered.size()):
+			var ci := int(filtered[k])
+			m.add_item("Create wire rule: %s" % String(entries[ci][&"label"]), wire_base + k)
+	var mp: Vector2i = DisplayServer.mouse_get_position()
+	m.position = mp
+	m.popup()
+
+
+func _open_newlink_wire_rules_only_popup(host: Control, donor: UiState) -> void:
+	_newlink_mixed_host = host
+	_newlink_mixed_component = ""
+	_newlink_mixed_donor_st = donor
+	_newlink_mixed_binding_cands.clear()
+	var filtered2: PackedInt32Array = _WireGraphEditScript.filter_rule_template_indices_for_donor(donor)
+	_newlink_wire_filter_indices = filtered2
+	if filtered2.is_empty():
+		_show_newlink_no_wire_rules_dialog()
+		return
+	var m := _ensure_newlink_mixed_popup()
+	m.clear()
+	var entries := _WireRuleCatalogScript.rule_script_entries()
+	for k: int in range(filtered2.size()):
+		var ci := int(filtered2[k])
+		m.add_item("Create wire rule: %s" % String(entries[ci][&"label"]), k)
+	var mp: Vector2i = DisplayServer.mouse_get_position()
+	m.position = mp
+	m.popup()
+
+
+func _on_newlink_mixed_menu_id(menu_id: int) -> void:
+	if _newlink_mixed_host == null or _newlink_mixed_donor_st == null:
+		return
+	var nbind := _newlink_mixed_binding_cands.size()
+	var committed := false
+	if nbind > 0:
+		if menu_id >= 0 and menu_id < nbind:
+			var row: Dictionary = _newlink_mixed_binding_cands[menu_id] as Dictionary
+			var prop: StringName = row[&"property"] as StringName
+			committed = _NewBindingScript.try_commit_assign(
+				_newlink_mixed_host,
+				_newlink_mixed_component,
+				prop,
+				_newlink_mixed_donor_st,
+				_actions
+			)
+		else:
+			var widx := menu_id - nbind
+			if widx < 0 or widx >= _newlink_wire_filter_indices.size():
+				_newlink_mixed_host = null
+				_newlink_mixed_donor_st = null
+				_newlink_mixed_binding_cands.clear()
+				_newlink_mixed_component = ""
+				_newlink_wire_filter_indices = PackedInt32Array()
+				return
+			var catalog_i := int(_newlink_wire_filter_indices[widx])
+			committed = _WireGraphEditScript.try_commit_append_wire_rule_with_in(
+				_newlink_mixed_host, catalog_i, _newlink_mixed_donor_st, _actions
+			)
+	else:
+		if menu_id < 0 or menu_id >= _newlink_wire_filter_indices.size():
+			_newlink_mixed_host = null
+			_newlink_mixed_donor_st = null
+			_newlink_mixed_binding_cands.clear()
+			_newlink_mixed_component = ""
+			_newlink_wire_filter_indices = PackedInt32Array()
+			return
+		var catalog_i2 := int(_newlink_wire_filter_indices[menu_id])
+		committed = _WireGraphEditScript.try_commit_append_wire_rule_with_in(
+			_newlink_mixed_host, catalog_i2, _newlink_mixed_donor_st, _actions
+		)
+	_newlink_mixed_host = null
+	_newlink_mixed_donor_st = null
+	_newlink_mixed_binding_cands.clear()
+	_newlink_mixed_component = ""
+	_newlink_wire_filter_indices = PackedInt32Array()
+	if not committed:
+		return
+	if _request_dock_refresh.is_valid():
+		_request_dock_refresh.call()
+	refresh()
+
+
+func _ensure_newlink_mount_popup() -> PopupMenu:
+	if _newlink_mount_popup != null:
+		return _newlink_mount_popup
+	_newlink_mount_popup = PopupMenu.new()
+	var bc2: Control = _plugin.get_editor_interface().get_base_control()
+	bc2.add_child(_newlink_mount_popup)
+	_explain_signal_scope.connect_bound(_newlink_mount_popup.id_pressed, _on_newlink_mount_menu_id)
+	return _newlink_mount_popup
+
+
+func _open_newlink_computed_mount_picker(root: Node, donor_st: UiState, mounts: Array) -> void:
+	_newlink_mount_donor_st = donor_st
+	_newlink_mount_list = mounts.duplicate()
+	var m := _ensure_newlink_mount_popup()
+	m.clear()
+	for i: int in range(mounts.size()):
+		var md: Dictionary = mounts[i] as Dictionary
+		m.add_item(
+			"Create computed source link: %s  |  %s" % [
+				str(md.get(&"host_path", "")),
+				str(md.get(&"computed_context", "")),
+			],
+			i
+		)
+	var mp2: Vector2i = DisplayServer.mouse_get_position()
+	m.position = mp2
+	m.popup()
+
+
+func _on_newlink_mount_menu_id(menu_id: int) -> void:
+	if _newlink_mount_donor_st == null:
+		return
+	var ei := _plugin.get_editor_interface()
+	var root := ei.get_edited_scene_root()
+	if root == null:
+		return
+	if menu_id < 0 or menu_id >= _newlink_mount_list.size():
+		_newlink_mount_donor_st = null
+		_newlink_mount_list.clear()
+		return
+	var mount: Dictionary = _newlink_mount_list[menu_id] as Dictionary
+	var committed := _commit_newlink_computed_append_to_mount(root, mount, _newlink_mount_donor_st)
+	_newlink_mount_donor_st = null
+	_newlink_mount_list.clear()
+	if not committed:
+		return
+	if _request_dock_refresh.is_valid():
+		_request_dock_refresh.call()
+	refresh()
+
+
+func _on_graph_edge_disconnect_requested(edge_idx: int) -> void:
+	if edge_idx != _graph_selected_edge_index:
+		return
+	_attempt_graph_edge_disconnect()
+
+
+func _try_commit_binding_rebind_from_edge(ed: Dictionary, ui_st: UiState, root: Node) -> bool:
+	var hp := str(ed.get(&"host_path", ""))
+	var bp := str(ed.get(&"binding_property", ""))
+	if bp.is_empty():
+		bp = str(ed.get(&"label", ""))
+	if hp.is_empty() or bp.is_empty():
+		return false
+	if not root.has_node(NodePath(hp)):
+		push_warning(
+			"Ui React: the control path %s is no longer in the scene. Save/reload the scene and Rescan the graph before rebinding." % hp
+		)
+		return false
+	var n: Node = root.get_node(NodePath(hp))
+	if not (n is Control):
+		return false
+	var prop_sn := StringName(bp)
+	if not prop_sn in n:
+		push_warning(
+			"Ui React: that control no longer has Inspector field %s. Rescan the graph or pick a binding that still exists." % bp
+		)
+		return false
+	_actions.assign_property_variant(n, prop_sn, ui_st, "Ui React: Rebind %s" % bp)
+	return true
+
+
+func _try_commit_wire_rebind_from_edge(ed: Dictionary, for_input: bool, ui_st: UiState, root: Node) -> bool:
+	var wh := str(ed.get(&"wire_host_path", ""))
+	var wi := int(ed.get(&"wire_rule_index", -1))
+	var win := str(ed.get(&"wire_in_property", ""))
+	var wout := str(ed.get(&"wire_out_property", ""))
+	var wprop := StringName(win if for_input else wout)
+	if wh.is_empty() or wi < 0 or wprop == &"":
+		return false
+	if not root.has_node(NodePath(wh)):
+		push_warning(
+			"Ui React: wire rule host path %s is no longer in the scene. Reload the scene and Rescan before editing this edge." % wh
+		)
+		return false
+	var host_n: Node = root.get_node(NodePath(wh))
+	if not (host_n is Control):
+		return false
+	var host := host_n as Control
+	if not (&"wire_rules" in host):
+		push_warning(
+			"Ui React: that node at %s has no Wire rules export. Add wire rules in the Inspector or pick the correct host in the graph." % wh
+		)
+		return false
+	return _WireGraphEditScript.try_commit_wire_slot_rebind(host, wi, wprop, ui_st, _actions)
+
+
+func _on_graph_reconnect_drag_ended(edge_idx: int, origin_id: String, target_id: String) -> void:
+	if _plugin == null or _actions == null or target_id.is_empty():
+		return
+	if not _reconnect_is_valid_drop(edge_idx, origin_id, target_id):
+		return
+	var root := _plugin.get_editor_interface().get_edited_scene_root()
+	if root == null:
+		return
+	var edges: Array = _last_layout.get(&"draw_edges", []) as Array
+	if edge_idx < 0 or edge_idx >= edges.size():
+		return
+	var ev: Variant = edges[edge_idx]
+	if ev is not Dictionary:
+		return
+	var ed: Dictionary = ev as Dictionary
+	var nb: Dictionary = _last_layout.get(&"node_by_id", {}) as Dictionary
+	var new_st: UiState = _ResolverScript.try_resolve_uistate(root, target_id, nb)
+	if new_st == null:
+		return
+	var k := int(ed.get(&"kind", -1))
+	var committed := false
+	if k == _SnapScript.EdgeKind.BINDING:
+		committed = _try_commit_binding_rebind_from_edge(ed, new_st, root)
+	elif k == _SnapScript.EdgeKind.COMPUTED_SOURCE:
+		var hp_c := str(ed.get(&"host_path", ""))
+		var ctx := str(ed.get(&"computed_context", ""))
+		var csi := int(ed.get(&"computed_source_index", -1))
+		if not root.has_node(NodePath(hp_c)):
+			push_warning(
+				"Ui React: computed host path %s is no longer valid. Reload the scene and Rescan the graph." % hp_c
+			)
+			return
+		var host_c: Node = root.get_node(NodePath(hp_c))
+		if not (host_c is Control):
+			return
+		committed = _ComputedRebindScript.try_commit_replace_source(
+			host_c as Control, ctx, csi, new_st, _actions
+		)
+	elif k == _SnapScript.EdgeKind.WIRE_FLOW:
+		var for_input := origin_id == str(ed.get(&"from_id", ""))
+		committed = _try_commit_wire_rebind_from_edge(ed, for_input, new_st, root)
+	if not committed:
+		return
+	if _request_dock_refresh.is_valid():
+		_request_dock_refresh.call()
+	refresh()
+
+
+func _on_rebind_binding_pressed() -> void:
+	if not _can_rebind_binding_edge():
+		return
+	var edges: Array = _last_layout.get(&"draw_edges", []) as Array
+	var ed: Dictionary = edges[_graph_selected_edge_index] as Dictionary
+	_rebind_kind = UiReactDockExplainMenuIds._REBIND_BINDING
+	_rebind_host_path = str(ed.get(&"host_path", ""))
+	_rebind_property = str(ed.get(&"binding_property", ""))
+	if _rebind_property.is_empty():
+		_rebind_property = str(ed.get(&"label", ""))
+	var dlg := _ensure_rebind_file_dialog()
+	dlg.title = "Pick UiState resource"
+	dlg.popup_centered_ratio(0.6)
+
+
+func _on_rebind_wire_in_pressed() -> void:
+	if not _can_rebind_wire_endpoint(true):
+		return
+	var edges: Array = _last_layout.get(&"draw_edges", []) as Array
+	var ed: Dictionary = edges[_graph_selected_edge_index] as Dictionary
+	_rebind_kind = UiReactDockExplainMenuIds._REBIND_WIRE_IN
+	_rebind_wire_host_path = str(ed.get(&"wire_host_path", ""))
+	_rebind_wire_rule_index = int(ed.get(&"wire_rule_index", -1))
+	_rebind_wire_prop = StringName(str(ed.get(&"wire_in_property", "")))
+	var dlg := _ensure_rebind_file_dialog()
+	dlg.title = "Pick UiState for wire input"
+	dlg.popup_centered_ratio(0.6)
+
+
+func _on_rebind_wire_out_pressed() -> void:
+	if not _can_rebind_wire_endpoint(false):
+		return
+	var edges: Array = _last_layout.get(&"draw_edges", []) as Array
+	var ed: Dictionary = edges[_graph_selected_edge_index] as Dictionary
+	_rebind_kind = UiReactDockExplainMenuIds._REBIND_WIRE_OUT
+	_rebind_wire_host_path = str(ed.get(&"wire_host_path", ""))
+	_rebind_wire_rule_index = int(ed.get(&"wire_rule_index", -1))
+	_rebind_wire_prop = StringName(str(ed.get(&"wire_out_property", "")))
+	var dlg := _ensure_rebind_file_dialog()
+	dlg.title = "Pick UiState for wire output"
+	dlg.popup_centered_ratio(0.6)
+
+
+func _on_rebind_computed_source_pressed() -> void:
+	if not _can_rebind_computed_source():
+		return
+	var edges: Array = _last_layout.get(&"draw_edges", []) as Array
+	var ed: Dictionary = edges[_graph_selected_edge_index] as Dictionary
+	_rebind_kind = UiReactDockExplainMenuIds._REBIND_COMPUTED_SOURCE
+	_rebind_host_path = str(ed.get(&"host_path", ""))
+	_rebind_computed_context = str(ed.get(&"computed_context", ""))
+	_rebind_computed_source_index = int(ed.get(&"computed_source_index", -1))
+	var dlg := _ensure_rebind_file_dialog()
+	dlg.title = "Pick UiState for computed source"
+	dlg.popup_centered_ratio(0.6)
+
+
+func _ensure_rebind_file_dialog() -> EditorFileDialog:
+	if _rebind_file_dialog != null:
+		return _rebind_file_dialog
+	var dlg := EditorFileDialog.new()
+	dlg.file_mode = EditorFileDialog.FILE_MODE_OPEN_FILE
+	dlg.access = EditorFileDialog.ACCESS_RESOURCES
+	dlg.title = "Pick UiState resource"
+	dlg.add_filter("*.tres", "Tres resources")
+	_explain_signal_scope.connect_bound(dlg.file_selected, _on_rebind_file_selected)
+	var base: Control = _plugin.get_editor_interface().get_base_control()
+	base.add_child(dlg)
+	_rebind_file_dialog = dlg
+	return dlg
+
+
+func _on_rebind_file_selected(path: String) -> void:
+	if _plugin == null or _actions == null:
+		return
+	var root := _plugin.get_editor_interface().get_edited_scene_root()
+	if root == null:
+		return
+	var res: Resource = load(path)
+	if res == null:
+		push_warning(
+			"Ui React: could not load %s. Check the path exists and is a saved .tres, then pick the file again." % path
+		)
+		return
+	if not (res is UiState):
+		push_warning(
+			"Ui React: %s is not a UiState resource. Pick a bool/int/float/string/array state .tres from your project." % path
+		)
+		return
+	var ui_st := res as UiState
+	var committed := false
+	match _rebind_kind:
+		UiReactDockExplainMenuIds._REBIND_BINDING:
+			var edges_b: Array = _last_layout.get(&"draw_edges", []) as Array
+			var idx_b := _graph_selected_edge_index
+			if idx_b < 0 or idx_b >= edges_b.size():
+				return
+			var ed_b: Variant = edges_b[idx_b]
+			if ed_b is not Dictionary:
+				return
+			committed = _try_commit_binding_rebind_from_edge(ed_b as Dictionary, ui_st, root)
+		UiReactDockExplainMenuIds._REBIND_WIRE_IN, UiReactDockExplainMenuIds._REBIND_WIRE_OUT:
+			var edges_w: Array = _last_layout.get(&"draw_edges", []) as Array
+			var idx_w := _graph_selected_edge_index
+			if idx_w < 0 or idx_w >= edges_w.size():
+				return
+			var ed_w: Variant = edges_w[idx_w]
+			if ed_w is not Dictionary:
+				return
+			var for_in := _rebind_kind == UiReactDockExplainMenuIds._REBIND_WIRE_IN
+			committed = _try_commit_wire_rebind_from_edge(ed_w as Dictionary, for_in, ui_st, root)
+		UiReactDockExplainMenuIds._REBIND_COMPUTED_SOURCE:
+			var hp_c := _rebind_host_path
+			var ctx := _rebind_computed_context
+			var csi := _rebind_computed_source_index
+			if hp_c.is_empty() or ctx.is_empty() or csi < 0:
+				return
+			if not root.has_node(NodePath(hp_c)):
+				push_warning(
+					"Ui React: computed host path %s is no longer valid. Reload the scene and Rescan the graph." % hp_c
+				)
+				return
+			var host_c: Node = root.get_node(NodePath(hp_c))
+			if not (host_c is Control):
+				return
+			committed = _ComputedRebindScript.try_commit_replace_source(
+				host_c as Control,
+				ctx,
+				csi,
+				ui_st,
+				_actions
+			)
+		_:
+			return
+	if not committed:
+		return
+	_rebind_kind = UiReactDockExplainMenuIds._REBIND_NONE
+	if _request_dock_refresh.is_valid():
+		_request_dock_refresh.call()
+	refresh()
+
+
+func _set_details_placeholder() -> void:
+	_set_details_both(_details_idle_placeholder_bb(), _details_idle_placeholder_plain())
+
+
+func _details_idle_placeholder_bb() -> String:
+	return (
+		"[i]Pick a node or an edge to read details here.[/i]\n\n" + _DETAILS_GRAPH_HELP_BB
+	)
+
+
+func _details_idle_placeholder_plain() -> String:
+	return "Pick a node or an edge to read details here.\n\n" + _DETAILS_GRAPH_HELP_PLAIN
+
+
+func _set_details_empty() -> void:
+	_set_details_both(
+		"[i]No graph yet for this scope — click Refresh after you change bindings or filters.[/i]\n\n" + _DETAILS_GRAPH_HELP_BB,
+		"No graph yet for this scope — click Refresh after you change bindings or filters.\n\n" + _DETAILS_GRAPH_HELP_PLAIN,
+	)
+
+
+func _set_details_both(bb: String, plain: String) -> void:
+	bb = UiReactDockExplainDetailsPresenter.normalize_details_newlines(bb)
+	plain = UiReactDockExplainDetailsPresenter.normalize_details_newlines(plain)
+	if _details:
+		_details.text = bb
+	_last_details_plain = plain
+
+
+func _get_narrative_cached(anchor_id: String) -> Variant:
+	return _get_narrative_cached_ex(anchor_id, PackedStringArray(), PackedStringArray())
+
+
+func _join_sorted_ids(ids: PackedStringArray) -> String:
+	var arr: Array[String] = []
+	for i in ids.size():
+		arr.append(String(ids[i]))
+	arr.sort()
+	return ",".join(arr)
+
+
+func _narrative_cache_key(
+	anchor_id: String, up_ex: PackedStringArray, down_ex: PackedStringArray
+) -> String:
+	if up_ex.is_empty() and down_ex.is_empty():
+		return anchor_id
+	return "%s|u:%s|d:%s" % [anchor_id, _join_sorted_ids(up_ex), _join_sorted_ids(down_ex)]
+
+
+func _get_narrative_cached_ex(
+	anchor_id: String, up_ex: PackedStringArray, down_ex: PackedStringArray
+) -> Variant:
+	var cache_key := _narrative_cache_key(anchor_id, up_ex, down_ex)
+	if _narrative_cache.has(cache_key):
+		return _narrative_cache[cache_key]
+	if _plugin == null or _last_snap == null:
+		return null
+	var ei := _plugin.get_editor_interface()
+	var root := ei.get_edited_scene_root()
+	if root == null:
+		return null
+	var snap: UiReactExplainGraphSnapshot = _last_snap as UiReactExplainGraphSnapshot
+	var raw: Variant = UiReactExplainGraphBuilder.compute_narrative(
+		root,
+		snap,
+		anchor_id,
+		_show_full_lists,
+		up_ex,
+		down_ex
+	)
+	var narr: Object = raw as Object
+	if narr != null:
+		_narrative_cache[cache_key] = narr
+	return narr
+
+
+func _edge_anchor_id(from_id: String, to_id: String) -> String:
+	if UiReactDockExplainGraphMutations.snapshot_has_node_id(_last_snap, from_id):
+		return from_id
+	return to_id
+
+
+## Returns [upstream_exclude, downstream_exclude] for edge Graph context display lines only.
+func _edge_graph_context_display_excludes(
+	from_id: String, to_id: String, _kind: int, anchor_id: String
+) -> Array:
+	var up_ex := PackedStringArray()
+	var down_ex := PackedStringArray()
+	if anchor_id == from_id and not to_id.is_empty() and to_id != anchor_id:
+		down_ex.append(to_id)
+	elif anchor_id == to_id and not from_id.is_empty() and from_id != anchor_id:
+		up_ex.append(from_id)
+	return [up_ex, down_ex]
+
+
+func _on_full_lists_toggled(pressed: bool) -> void:
+	_show_full_lists = pressed
+	_narrative_cache.clear()
+	if _selection_kind == UiReactDockExplainMenuIds._SEL_NODE and not _graph_selected_node_id.is_empty():
+		_fill_node_details(_graph_selected_node_id)
+	elif _selection_kind == UiReactDockExplainMenuIds._SEL_EDGE:
+		_fill_edge_details(
+			_last_edge_from_id,
+			_last_edge_to_id,
+			_last_edge_kind,
+			_last_edge_label,
+			_graph_selected_edge_index
+		)
+
+
+func _narrative_anchor_kind(anchor_id: String) -> int:
+	if anchor_id.is_empty():
+		return -1
+	var nb: Dictionary = _last_layout.get(&"node_by_id", {}) as Dictionary
+	var d: Dictionary = nb.get(anchor_id, {}) as Dictionary
+	if d.is_empty():
+		return -1
+	return int(d.get(&"kind", -1))
+
+
+func _narrative_upstream_heading_bb_plain(anchor_kind: int) -> PackedStringArray:
+	var h := UiReactDockExplainDetailsPresenter.details_block_head_bb_plain("Upstream")
+	var body_bb := ""
+	var body_plain := ""
+	if anchor_kind == _SnapScript.NodeKind.CONTROL:
+		body_bb = "States and computed resources that feed this control's bindings.\n"
+		body_plain = "States and computed resources that feed this control's bindings.\n"
+	else:
+		body_bb = "Declarative reach toward this resource.\n"
+		body_plain = "Declarative reach toward this resource.\n"
+	return PackedStringArray([h[0] + body_bb, h[1] + body_plain])
+
+
+func _narrative_downstream_heading_bb_plain(anchor_kind: int) -> PackedStringArray:
+	var h := UiReactDockExplainDetailsPresenter.details_block_head_bb_plain("Downstream")
+	var body_bb := ""
+	var body_plain := ""
+	if anchor_kind == _SnapScript.NodeKind.CONTROL:
+		body_bb = "States, computed resources, or controls reached through this control's bindings.\n"
+		body_plain = "States, computed resources, or controls reached through this control's bindings.\n"
+	else:
+		body_bb = "States, computed resources, or controls this resource feeds.\n"
+		body_plain = "States, computed resources, or controls this resource feeds.\n"
+	return PackedStringArray([h[0] + body_bb, h[1] + body_plain])
+
+
+func _append_reachability_from_narrative(narr: Object) -> PackedStringArray:
+	var bb := ""
+	var plain := ""
+	if narr == null:
+		return PackedStringArray([bb, plain])
+	var n_narr := narr as UiReactExplainGraphNarrative
+	if n_narr == null:
+		return PackedStringArray([bb, plain])
+	var ak := _narrative_anchor_kind(n_narr.anchor_id)
+	var up_h := _narrative_upstream_heading_bb_plain(ak)
+	bb += up_h[0]
+	plain += up_h[1]
+	if n_narr.upstream_display_lines.is_empty():
+		if ak == _SnapScript.NodeKind.CONTROL:
+			var msg := "[i]No upstream — only direct bindings feed this control.[/i]\n"
+			bb += msg
+			plain += UiReactDockExplainDetailsPresenter.plain_from_bbcode_line(msg)
+		elif ak == _SnapScript.NodeKind.UI_STATE or ak == _SnapScript.NodeKind.UI_COMPUTED:
+			var msg_r := "[i]No upstream — no declarative sources reach this resource.[/i]\n"
+			bb += msg_r
+			plain += UiReactDockExplainDetailsPresenter.plain_from_bbcode_line(msg_r)
+		else:
+			var msg2 := "[i]No upstream.[/i]\n"
+			bb += msg2
+			plain += UiReactDockExplainDetailsPresenter.plain_from_bbcode_line(msg2)
+	else:
+		for line2: String in n_narr.upstream_display_lines:
+			bb += line2
+			plain += UiReactDockExplainDetailsPresenter.plain_from_bbcode_line(line2)
+	var down_h := _narrative_downstream_heading_bb_plain(ak)
+	bb += down_h[0]
+	plain += down_h[1]
+	var dsl: PackedStringArray = n_narr.downstream_state_display_lines
+	var dcl: PackedStringArray = n_narr.downstream_control_display_lines
+	if dsl.is_empty() and dcl.is_empty():
+		bb += "(none)\n"
+		plain += "(none)\n"
+	else:
+		if not dsl.is_empty():
+			var st_h := UiReactDockExplainDetailsPresenter.details_block_head_bb_plain("States / Computed")
+			bb += st_h[0]
+			plain += st_h[1]
+			for line3: String in dsl:
+				bb += line3
+				plain += UiReactDockExplainDetailsPresenter.plain_from_bbcode_line(line3)
+		if not dcl.is_empty():
+			var ct_h := UiReactDockExplainDetailsPresenter.details_block_head_bb_plain("Controls")
+			bb += ct_h[0]
+			plain += ct_h[1]
+			for line4: String in dcl:
+				bb += line4
+				plain += UiReactDockExplainDetailsPresenter.plain_from_bbcode_line(line4)
+	return PackedStringArray([bb, plain])
+
+
+func _append_cycle_section_bb_plain(anchor_id: String) -> PackedStringArray:
+	if _last_snap == null:
+		return PackedStringArray(["", ""])
+	var snap: UiReactExplainGraphSnapshot = _last_snap as UiReactExplainGraphSnapshot
+	var is_hub := anchor_id == _last_focus_id
+	var cap := 999999 if (is_hub or _show_full_lists) else UiReactDockExplainContextMenus.CYCLE_SUMMARY_CAP
+	var matching: Array[Dictionary] = []
+	for c: Variant in snap.cycle_candidates:
+		if c is not Dictionary:
+			continue
+		var cd: Dictionary = c as Dictionary
+		if is_hub:
+			matching.append(cd)
+		else:
+			var ids := cd.get(&"node_ids", PackedStringArray()) as PackedStringArray
+			if _id_in_packed(ids, anchor_id):
+				matching.append(cd)
+	if matching.is_empty():
+		return PackedStringArray(["", ""])
+	var cyc_h := UiReactDockExplainDetailsPresenter.details_block_head_bb_plain("Cycle Candidates")
+	var bb := cyc_h[0]
+	var plain := cyc_h[1]
+	bb += "[i]Static analysis using state and computed edges only.[/i]\n"
+	plain += "Static analysis using state and computed edges only.\n"
+	var n_show := mini(matching.size(), cap)
+	for i in n_show:
+		var sm := str(matching[i].get(&"summary", "?"))
+		bb += "• [code]%s[/code]\n" % sm
+		plain += "• %s\n" % sm
+	var more := matching.size() - n_show
+	if more > 0:
+		bb += "• [i]+%d more[/i]\n" % more
+		plain += "• +%d more\n" % more
+	return PackedStringArray([bb, plain])
+
+
+func _mismatch_banner_bb_plain(narr: Object) -> PackedStringArray:
+	if narr == null:
+		return PackedStringArray(["", ""])
+	var layout_nb: Dictionary = _last_layout.get(&"node_by_id", {}) as Dictionary
+	var missing := false
+	for i in narr.upstream_node_ids.size():
+		var idu := String(narr.upstream_node_ids[i])
+		if not layout_nb.has(idu):
+			missing = true
+			break
+	if not missing:
+		for j in narr.downstream_node_ids.size():
+			var idd := String(narr.downstream_node_ids[j])
+			if not layout_nb.has(idd):
+				missing = true
+				break
+	var stats: Dictionary = _last_layout.get(&"graph_stats", {}) as Dictionary
+	var truncated := bool(stats.get(&"truncated", false))
+	if not missing and not truncated:
+		return PackedStringArray(["", ""])
+	var cn_h := UiReactDockExplainDetailsPresenter.details_block_head_bb_plain("Canvas Note")
+	var bb := cn_h[0]
+	var plain := cn_h[1]
+	if missing:
+		bb += "Some nodes in this narrative are [b]not drawn[/b] (layout scope, caps, or edge filters).\n"
+		plain += "Some nodes in this narrative are not drawn (layout scope, caps, or edge filters).\n"
+	if truncated:
+		bb += "This graph layout is [b]truncated[/b] (node/edge caps).\n"
+		plain += "This graph layout is truncated (node/edge caps).\n"
+	return PackedStringArray([bb, plain])
+
+
+func _id_in_packed(ids: PackedStringArray, needle: String) -> bool:
+	for i in ids.size():
+		if String(ids[i]) == needle:
+			return true
+	return false
+
+
+func _find_binding_edge_for_prop(incident: Array[Dictionary], node_id: String, prop: String) -> Dictionary:
+	for ed: Dictionary in incident:
+		if int(ed.get(&"kind", -1)) != _SnapScript.EdgeKind.BINDING:
+			continue
+		if str(ed.get(&"to_id", "")) != node_id:
+			continue
+		var bp := str(ed.get(&"binding_property", ""))
+		var lab := str(ed.get(&"label", ""))
+		if bp == prop or lab == prop:
+			return ed
+	return {}
+
+
+func _connections_section_bb_plain(node_id: String, d: Dictionary, edges: Array) -> PackedStringArray:
+	if int(d.get(&"kind", -1)) != _SnapScript.NodeKind.CONTROL or not node_id.begins_with("ctrl:"):
+		return PackedStringArray(["", ""])
+	var cx_h := UiReactDockExplainDetailsPresenter.details_block_head_bb_plain("Connections")
+	var bb := cx_h[0]
+	var plain := cx_h[1]
+	var host := _resolve_control_host_from_node(node_id, d)
+	var incident: Array[Dictionary] = []
+	for e: Variant in edges:
+		if e is not Dictionary:
+			continue
+		var ed0: Dictionary = e as Dictionary
+		if str(ed0.get(&"from_id", "")) == node_id or str(ed0.get(&"to_id", "")) == node_id:
+			incident.append(ed0)
+	incident.sort_custom(
+		func(a: Dictionary, b: Dictionary) -> bool:
+			var ka := int(a.get(&"kind", -1))
+			var kb := int(b.get(&"kind", -1))
+			if ka != kb:
+				return ka < kb
+			var fa := str(a.get(&"from_id", ""))
+			var fb := str(b.get(&"from_id", ""))
+			if fa != fb:
+				return fa < fb
+			return str(a.get(&"to_id", "")) < str(b.get(&"to_id", ""))
+	)
+	if host == null:
+		bb += "• [i]Could not list binding slots (control missing).[/i]\n"
+		plain += "• Could not list binding slots (control missing).\n"
+		return PackedStringArray([bb, plain])
+	var comp := UiReactScannerService.get_component_name_from_script(host.get_script() as Script)
+	var rows: Array[Dictionary] = UiReactGraphNewBindingService.list_registry_binding_rows(host, comp)
+	var consumed: Dictionary = {}
+	if rows.is_empty():
+		var any_bind := false
+		for ed1: Dictionary in incident:
+			if int(ed1.get(&"kind", -1)) != _SnapScript.EdgeKind.BINDING:
+				continue
+			if str(ed1.get(&"to_id", "")) != node_id:
+				continue
+			any_bind = true
+			consumed[UiReactDockExplainGraphMutations.incident_edge_sig(ed1)] = true
+			var pair0 := _format_incident_edge_bb_plain(ed1)
+			bb += pair0[0] + "\n"
+			plain += pair0[1] + "\n"
+		if not any_bind:
+			bb += "[i]No registry bindings are listed for this component.[/i]\n"
+			plain += "No registry bindings are listed for this component.\n"
+	else:
+		for row: Dictionary in rows:
+			var prop_sn: StringName = row.get(&"property", &"") as StringName
+			var ps := str(prop_sn)
+			var is_bound := bool(row.get(&"bound", false))
+			if not is_bound:
+				bb += "• [code]%s[/code] — unbound\n" % ps
+				plain += "• %s — unbound\n" % ps
+			else:
+				var vl := str(row.get(&"value_label", ""))
+				bb += "• [code]%s[/code] → [code]%s[/code]\n" % [ps, vl]
+				plain += "• %s → %s\n" % [ps, vl]
+				var bed := _find_binding_edge_for_prop(incident, node_id, ps)
+				if not bed.is_empty():
+					consumed[UiReactDockExplainGraphMutations.incident_edge_sig(bed)] = true
+					var pair1 := _format_incident_edge_bb_plain(bed)
+					var subb := pair1[0].strip_edges()
+					if subb.begins_with("• "):
+						subb = subb.substr(2)
+					bb += UiReactDockExplainContextMenus.CONNECTIONS_BINDING_EDGE_CONTINUATION + subb + "\n"
+					var subp := pair1[1].strip_edges()
+					if subp.begins_with("• "):
+						subp = subp.substr(2)
+					plain += UiReactDockExplainContextMenus.CONNECTIONS_BINDING_EDGE_CONTINUATION + subp + "\n"
+	var others: Array[Dictionary] = []
+	for ed2: Dictionary in incident:
+		if consumed.has(UiReactDockExplainGraphMutations.incident_edge_sig(ed2)):
+			continue
+		others.append(ed2)
+	if not others.is_empty():
+		var oe2 := UiReactDockExplainDetailsPresenter.details_block_head_bb_plain("Other Edges")
+		bb += "\n" + oe2[0]
+		plain += "\n" + oe2[1]
+		for ed3: Dictionary in others:
+			var pair2 := _format_incident_edge_bb_plain(ed3)
+			bb += pair2[0] + "\n"
+			plain += pair2[1] + "\n"
+	return PackedStringArray([bb, plain])
+
+
+func _wire_rules_summary_bb_plain(host: Control) -> PackedStringArray:
+	if host == null or not (&"wire_rules" in host):
+		return PackedStringArray(["", ""])
+	var wr: Variant = host.get(&"wire_rules")
+	if wr == null or wr is not Array:
+		return PackedStringArray(["", ""])
+	var arr: Array = wr as Array
+	if arr.is_empty():
+		return PackedStringArray(["", ""])
+	var wr_h := UiReactDockExplainDetailsPresenter.details_block_head_bb_plain("Wire Rules")
+	var bb := wr_h[0]
+	var plain := wr_h[1]
+	for i in range(arr.size()):
+		var rule_var: Variant = arr[i]
+		if rule_var == null or not (rule_var is UiReactWireRule):
+			bb += "• (invalid row %d)\n" % i
+			plain += "• (invalid row %d)\n" % i
+			continue
+		var rule := rule_var as UiReactWireRule
+		var trig_label := _WireGraphEditScript.wire_trigger_kind_label(int(rule.trigger))
+		var io_list := UiReactWireRuleIntrospection.list_io(rule)
+		var ins: Array[String] = []
+		var outs: Array[String] = []
+		for entry: Dictionary in io_list:
+			var role := str(entry.get(&"role", ""))
+			var prop := str(entry.get(&"property", ""))
+			var st: Variant = entry.get(&"state", null)
+			var frag := prop
+			if st != null and st is UiState:
+				var us := st as UiState
+				var rp := str(us.resource_path)
+				if not rp.is_empty():
+					frag = rp.get_file()
+			if frag.is_empty():
+				frag = "?"
+			if role == "in":
+				ins.append(frag)
+			elif role == "out":
+				outs.append(frag)
+		var in_str := ", ".join(ins)
+		var out_str := ", ".join(outs)
+		if in_str.is_empty():
+			in_str = "—"
+		if out_str.is_empty():
+			out_str = "—"
+		bb += "• Rule %d (%s). In: %s. Out: %s.\n" % [i, trig_label, in_str, out_str]
+		plain += "• Rule %d (%s). In: %s. Out: %s.\n" % [i, trig_label, in_str, out_str]
+	return PackedStringArray([bb, plain])
+
+
+func _wire_rules_section_has_rows_for_host(host: Control) -> bool:
+	if host == null or _wire_rules_section == null:
+		return false
+	if not (_wire_rules_section is CanvasItem):
+		return false
+	if not (_wire_rules_section as CanvasItem).visible:
+		return false
+	var wr: Variant = host.get(&"wire_rules")
+	return wr is Array and not (wr as Array).is_empty()
+
+
+func _append_selected_wire_rule_report_bb_plain(bb: String, plain: String) -> PackedStringArray:
+	if _wire_rules_section == null or _plugin == null:
+		return PackedStringArray([bb, plain])
+	if not (_wire_rules_section is CanvasItem):
+		return PackedStringArray([bb, plain])
+	if not (_wire_rules_section as CanvasItem).visible:
+		return PackedStringArray([bb, plain])
+	var host := _resolve_wire_rules_host_control()
+	if host == null:
+		return PackedStringArray([bb, plain])
+	var root := _plugin.get_editor_interface().get_edited_scene_root()
+	if root == null:
+		return PackedStringArray([bb, plain])
+	var wr: Variant = host.get(&"wire_rules")
+	var arr: Array = wr as Array if wr is Array else []
+	if arr.is_empty():
+		return PackedStringArray([bb, plain])
+	var sel_idx := _wire_rules_section.get_selected_rule_index()
+	if sel_idx < 0 or sel_idx >= arr.size():
+		var pick_h := UiReactDockExplainDetailsPresenter.details_block_head_bb_plain("Selected Wire Rule")
+		var pick_bb := pick_h[0] + "Select a rule in the list above to view full rule details.\n"
+		var pick_plain := pick_h[1] + "Select a rule in the list above to view full rule details.\n"
+		return UiReactDockExplainDetailsPresenter.details_append_major(bb, plain, pick_bb, pick_plain)
+	var item: Variant = arr[sel_idx]
+	var wr_h := UiReactDockExplainDetailsPresenter.details_block_head_bb_plain("Selected Wire Rule")
+	var wr_bb := wr_h[0] + _WireDetailsScript.build_details_bbcode(item, sel_idx, host, root)
+	var wr_plain := wr_h[1] + _WireDetailsScript.build_details_plain_text(item, sel_idx, host, root) + "\n"
+	return UiReactDockExplainDetailsPresenter.details_append_major(bb, plain, wr_bb, wr_plain)
+
+
+func _format_incident_edge_bb_plain(ed: Dictionary) -> PackedStringArray:
+	var fa := str(ed.get(&"from_id", ""))
+	var ta := str(ed.get(&"to_id", ""))
+	var k := int(ed.get(&"kind", -1))
+	var lab := str(ed.get(&"label", ""))
+	var tag := UiReactDockExplainGraphMutations.edge_short_token(k)
+	var s_from := _short_label_for_node_id(fa)
+	var s_to := _short_label_for_node_id(ta)
+	var bb := "• [code][%s][/code] %s → %s" % [tag, s_from, s_to]
+	var plain := "• [%s] %s → %s" % [tag, s_from, s_to]
+	if not lab.is_empty():
+		bb += "  ([code]%s[/code])" % lab
+		plain += " (%s)" % lab
+	return PackedStringArray([bb, plain])
+
+
+func _focus_relation_blurb_bb_plain(node_id: String, layout_focus_id: String, node_layer: Dictionary) -> PackedStringArray:
+	var rel_h := UiReactDockExplainDetailsPresenter.details_block_head_bb_plain("Relative to Layout Center")
+	var bb := rel_h[0]
+	var plain := rel_h[1]
+	if node_id == layout_focus_id:
+		bb += "At layout center — this is the focus control column in this layout.\n"
+		plain += "At layout center — this is the focus control column in this layout.\n"
+	else:
+		if not node_layer.has(node_id):
+			bb += "Weakly connected in this layout — present in scope but not on the main upstream/downstream spine used for layering.\n"
+			plain += "Weakly connected in this layout — present in scope but not on the main upstream/downstream spine used for layering.\n"
+		else:
+			var L := int(node_layer[node_id])
+			if L == UiReactExplainGraphLayout.LAYER_SENTINEL_UNREACHABLE:
+				bb += "Weakly connected in this layout — present in scope but not on the main upstream/downstream spine used for layering.\n"
+				plain += "Weakly connected in this layout — present in scope but not on the main upstream/downstream spine used for layering.\n"
+			elif L < 0:
+				bb += "Upstream side — closer to sources that feed the focus control's bindings (left side of this layout).\n"
+				plain += "Upstream side — closer to sources that feed the focus control's bindings (left side of this layout).\n"
+			elif L > 0:
+				bb += "Downstream side — reachable from states bound to the focus (right side of this layout).\n"
+				plain += "Downstream side — reachable from states bound to the focus (right side of this layout).\n"
+			else:
+				bb += "Same layout tier as the focus column — neighbors in this horizontal band.\n"
+				plain += "Same layout tier as the focus column — neighbors in this horizontal band.\n"
+	return PackedStringArray([bb, plain])
+
+
+func _fill_node_details(node_id: String) -> void:
+	if node_id.is_empty():
+		return
+	var narr: Object = _get_narrative_cached(node_id) as Object
+	var nb: Dictionary = _last_layout.get(&"node_by_id", {}) as Dictionary
+	var d: Dictionary = nb.get(node_id, {}) as Dictionary
+	var edges: Array = _last_layout.get(&"draw_edges", []) as Array
+	var layout_focus := str(_last_layout.get(&"focus_id", ""))
+	var node_layer: Dictionary = _last_layout.get(&"node_layer", {}) as Dictionary
+	var nk := int(d.get(&"kind", -1))
+
+	var head_bb := ""
+	var head_plain := ""
+	if narr != null and nk == _SnapScript.NodeKind.CONTROL:
+		for line0: String in (narr as UiReactExplainGraphNarrative).bound_state_lines:
+			head_bb += line0
+			head_plain += UiReactDockExplainDetailsPresenter.plain_from_bbcode_line(line0)
+
+	var bb := ""
+	var plain := ""
+	var j := UiReactDockExplainDetailsPresenter.details_append_major(bb, plain, head_bb, head_plain)
+	bb = j[0]
+	plain = j[1]
+
+	var conn := _connections_section_bb_plain(node_id, d, edges)
+	j = UiReactDockExplainDetailsPresenter.details_append_major(bb, plain, conn[0], conn[1])
+	bb = j[0]
+	plain = j[1]
+
+	if nk == _SnapScript.NodeKind.CONTROL:
+		var wh := _resolve_control_host_from_node(node_id, d)
+		if wh != null:
+			if not _wire_rules_section_has_rows_for_host(wh):
+				var wrs := _wire_rules_summary_bb_plain(wh)
+				j = UiReactDockExplainDetailsPresenter.details_append_major(bb, plain, wrs[0], wrs[1])
+				bb = j[0]
+				plain = j[1]
+
+	if narr != null:
+		var gc_h := UiReactDockExplainDetailsPresenter.details_block_head_bb_plain("Graph Context")
+		var graph_bb := gc_h[0]
+		var graph_plain := gc_h[1]
+		var reach := _append_reachability_from_narrative(narr)
+		graph_bb += reach[0]
+		graph_plain += reach[1]
+		var cyc := _append_cycle_section_bb_plain(node_id)
+		graph_bb += cyc[0]
+		graph_plain += cyc[1]
+		var mm := _mismatch_banner_bb_plain(narr)
+		graph_bb += mm[0]
+		graph_plain += mm[1]
+		j = UiReactDockExplainDetailsPresenter.details_append_major(bb, plain, graph_bb, graph_plain)
+		bb = j[0]
+		plain = j[1]
+
+	var incident: Array[Dictionary] = []
+	for e: Variant in edges:
+		if e is not Dictionary:
+			continue
+		var ed: Dictionary = e as Dictionary
+		if str(ed.get(&"from_id", "")) == node_id or str(ed.get(&"to_id", "")) == node_id:
+			incident.append(ed)
+	incident.sort_custom(
+		func(a: Dictionary, b: Dictionary) -> bool:
+			var ka := int(a.get(&"kind", -1))
+			var kb := int(b.get(&"kind", -1))
+			if ka != kb:
+				return ka < kb
+			var fa := str(a.get(&"from_id", ""))
+			var fb := str(b.get(&"from_id", ""))
+			if fa != fb:
+				return fa < fb
+			return str(a.get(&"to_id", "")) < str(b.get(&"to_id", ""))
+	)
+
+	if nk != _SnapScript.NodeKind.CONTROL:
+		var ie_h := UiReactDockExplainDetailsPresenter.details_block_head_bb_plain("Incident Edges")
+		var inc_bb := ie_h[0]
+		var inc_plain := ie_h[1]
+		if incident.is_empty():
+			inc_bb += "No edges touch this node in the scoped graph (or it is isolated after filters).\n"
+			inc_plain += "No edges touch this node in the scoped graph (or it is isolated after filters).\n"
+		else:
+			var n_show := mini(incident.size(), UiReactDockExplainContextMenus.INCIDENT_EDGE_CAP)
+			for i in n_show:
+				var pair := _format_incident_edge_bb_plain(incident[i])
+				inc_bb += pair[0] + "\n"
+				inc_plain += pair[1] + "\n"
+			var overflow := incident.size() - n_show
+			if overflow > 0:
+				inc_bb += "[i]+%d more in this graph[/i]\n" % overflow
+				inc_plain += "+%d more in this graph\n" % overflow
+		j = UiReactDockExplainDetailsPresenter.details_append_major(bb, plain, inc_bb, inc_plain)
+		bb = j[0]
+		plain = j[1]
+
+	var wrj := _append_selected_wire_rule_report_bb_plain(bb, plain)
+	_set_details_both(wrj[0], wrj[1])
+
+
+func _edge_details_summary_bb_plain(
+	from_id: String, to_id: String, kind: int, label: String, edge_index: int
+) -> PackedStringArray:
+	var edges: Array = _last_layout.get(&"draw_edges", []) as Array
+	var ed: Dictionary = {}
+	if edge_index >= 0 and edge_index < edges.size():
+		var ev: Variant = edges[edge_index]
+		if ev is Dictionary:
+			ed = ev as Dictionary
+	var from_short := _short_label_for_node_id(from_id)
+	var to_short := _short_label_for_node_id(to_id)
+	var bb := ""
+	var plain := ""
+	match kind:
+		_SnapScript.EdgeKind.BINDING:
+			var bp0 := str(ed.get(&"binding_property", label))
+			var bind_ri := UiReactDockExplainDetailsPresenter.details_run_in_bb_plain(
+				"Property Binding",
+				"[code]%s[/code] → [code]%s[/code], export [code]%s[/code]" % [from_short, to_short, bp0],
+				"%s → %s, export %s" % [from_short, to_short, bp0],
+			)
+			bb = bind_ri[0]
+			plain = bind_ri[1]
+		_SnapScript.EdgeKind.COMPUTED_SOURCE:
+			var si0 := int(ed.get(&"computed_source_index", -1))
+			var slot0 := _computed_source_slot_phrase_bb_plain(si0)
+			var ep0 := _edge_endpoint_pair_for_summary_bb_plain(from_id, to_id)
+			var body_cs_bb := "%s → %s, %s" % [ep0[0], ep0[2], slot0[0]]
+			var body_cs_plain := "%s → %s, %s" % [ep0[1], ep0[3], slot0[1]]
+			var cs_ri := UiReactDockExplainDetailsPresenter.details_run_in_bb_plain("Computed Source", body_cs_bb, body_cs_plain)
+			bb = cs_ri[0]
+			plain = cs_ri[1]
+		_SnapScript.EdgeKind.WIRE_FLOW:
+			var wf_h := UiReactDockExplainDetailsPresenter.details_block_head_bb_plain("Wire Flow")
+			bb = wf_h[0]
+			plain = wf_h[1]
+			bb += "[code]%s[/code] → [code]%s[/code]\n" % [from_short, to_short]
+			plain += "%s → %s\n" % [from_short, to_short]
+			bb += "This row under Wire rules connects input [code]%s[/code] to output [code]%s[/code] on the [code]wire_rules[/code] property.\n" % [
+				from_short,
+				to_short,
+			]
+			plain += "This row under Wire rules connects input %s to output %s on the wire_rules property.\n" % [
+				from_short,
+				to_short,
+			]
+			bb += "Each endpoint is a state or computed resource.\n"
+			plain += "Each endpoint is a state or computed resource.\n"
+		_:
+			var edge_ri := UiReactDockExplainDetailsPresenter.details_run_in_bb_plain(
+				"Edge",
+				"Declarative dependency between two snapshot nodes.",
+				"Declarative dependency between two snapshot nodes.",
+			)
+			bb = edge_ri[0]
+			plain = edge_ri[1]
+
+	var show_endpoints := not (
+		kind == _SnapScript.EdgeKind.BINDING
+		or kind == _SnapScript.EdgeKind.COMPUTED_SOURCE
+		or kind == _SnapScript.EdgeKind.WIRE_FLOW
+	)
+	if show_endpoints:
+		var ep_h := UiReactDockExplainDetailsPresenter.details_block_head_bb_plain("Endpoints")
+		bb += ep_h[0]
+		plain += ep_h[1]
+		bb += "From: [code]%s[/code] → To: [code]%s[/code]\n" % [from_short, to_short]
+		plain += "From: %s → To: %s\n" % [from_short, to_short]
+		if not label.is_empty():
+			bb += "Detail: [code]%s[/code]\n" % label
+			plain += "Detail: %s\n" % label
+
+	if kind == _SnapScript.EdgeKind.BINDING:
+		pass
+	elif kind == _SnapScript.EdgeKind.COMPUTED_SOURCE:
+		var si := int(ed.get(&"computed_source_index", -1))
+		var slot_sp := _computed_source_slot_phrase_bb_plain(si)
+		var ep := _edge_endpoint_pair_for_summary_bb_plain(from_id, to_id)
+		var cc := str(ed.get(&"computed_context", ""))
+		if not to_id.is_empty():
+			var own_ri := UiReactDockExplainDetailsPresenter.details_run_in_bb_plain(
+				"Computed Owner",
+				(
+					"%s, %s — target for [b]Rebind computed source…[/b] or [b]Remove computed dependency[/b]."
+					% [ep[2], slot_sp[0]]
+				),
+				(
+					"%s, %s — target for Rebind computed source… or Remove computed dependency."
+					% [ep[3], slot_sp[1]]
+				),
+			)
+			bb += own_ri[0]
+			plain += own_ri[1]
+		if not cc.is_empty():
+			bb += "[i]Resolver path[/i] — [code]%s[/code]\n" % cc
+			plain += "Resolver path — %s\n" % cc
+	elif kind == _SnapScript.EdgeKind.WIRE_FLOW:
+		var wh := str(ed.get(&"wire_host_path", ""))
+		var wi := int(ed.get(&"wire_rule_index", -1))
+		var win := str(ed.get(&"wire_in_property", ""))
+		var wout := str(ed.get(&"wire_out_property", ""))
+		if not win.is_empty() and not wout.is_empty():
+			var re_h := UiReactDockExplainDetailsPresenter.details_block_head_bb_plain("Rule Exports")
+			bb += re_h[0]
+			plain += re_h[1]
+			bb += "Input export [code]%s[/code] → output export [code]%s[/code] (dock action row: rebind input/output).\n" % [
+				win,
+				wout,
+			]
+			plain += "Input export %s → output export %s (dock action row: rebind input/output).\n" % [win, wout]
+		var root_w: Node = null
+		if _plugin != null:
+			root_w = _plugin.get_editor_interface().get_edited_scene_root()
+		var qef := _wire_rule_quick_edit_fields_bb_plain(root_w, wh, wi)
+		if not qef[0].is_empty() or not qef[1].is_empty():
+			bb += qef[0]
+			plain += qef[1]
+	return PackedStringArray([bb, plain])
+
+
+func _wire_rule_quick_edit_fields_bb_plain(
+	root: Node,
+	wire_host_path: String,
+	wire_rule_index: int
+) -> PackedStringArray:
+	if root == null or wire_host_path.is_empty() or wire_rule_index < 0:
+		return PackedStringArray(["", ""])
+	if not root.has_node(NodePath(wire_host_path)):
+		return PackedStringArray(["", ""])
+	var n: Node = root.get_node(NodePath(wire_host_path))
+	if not (n is Control):
+		return PackedStringArray(["", ""])
+	var wr: Variant = (n as Control).get(&"wire_rules")
+	var arr: Array = wr as Array if wr is Array else []
+	if wire_rule_index < 0 or wire_rule_index >= arr.size():
+		return PackedStringArray(["", ""])
+	var item: Variant = arr[wire_rule_index]
+	if item == null or not (item is UiReactWireRule):
+		return PackedStringArray(["", ""])
+	var rule := item as UiReactWireRule
+	var labels: PackedStringArray = PackedStringArray()
+	for d: Dictionary in _WireGraphEditScript.shallow_field_descriptors_for_rule(rule):
+		var label := String(d.get(&"label", d.get(&"prop", ""))).strip_edges()
+		if label.is_empty():
+			continue
+		labels.append(label)
+	if labels.is_empty():
+		return PackedStringArray(["", ""])
+	var joined := ", ".join(labels)
+	var head := UiReactDockExplainDetailsPresenter.details_block_head_bb_plain("Quick Edit Fields")
+	var bb := head[0]
+	var plain := head[1]
+	bb += "Available in [b]Quick edit[/b]: [code]%s[/code].\n" % joined
+	plain += "Available in Quick edit: %s.\n" % joined
+	return PackedStringArray([bb, plain])
+
+
+func _fill_edge_details(from_id: String, to_id: String, kind: int, label: String, edge_index: int) -> void:
+	var anchor_id := _edge_anchor_id(from_id, to_id)
+	var ex: Array = _edge_graph_context_display_excludes(from_id, to_id, kind, anchor_id)
+	var narr: Object = _get_narrative_cached_ex(
+		anchor_id, ex[0] as PackedStringArray, ex[1] as PackedStringArray
+	) as Object
+	var summ := _edge_details_summary_bb_plain(from_id, to_id, kind, label, edge_index)
+	var bb := summ[0]
+	var plain := summ[1]
+	if kind == _SnapScript.EdgeKind.WIRE_FLOW and edge_index >= 0:
+		var edges_l: Array = _last_layout.get(&"draw_edges", []) as Array
+		if edge_index < edges_l.size():
+			var ed0: Variant = edges_l[edge_index]
+			if ed0 is Dictionary and not bool((ed0 as Dictionary).get(&"wire_rule_enabled", true)):
+				bb += "This wire rule is [i]disabled (paused)[/i]; it will not run until re-enabled.\n"
+				plain += "This wire rule is disabled (paused); it will not run until re-enabled.\n"
+	if narr != null:
+		var gc_h := UiReactDockExplainDetailsPresenter.details_block_head_bb_plain("Graph Context")
+		var graph_bb2 := gc_h[0]
+		var graph_plain2 := gc_h[1]
+		var reach2 := _append_reachability_from_narrative(narr)
+		graph_bb2 += reach2[0]
+		graph_plain2 += reach2[1]
+		var cyc2 := _append_cycle_section_bb_plain(anchor_id)
+		graph_bb2 += cyc2[0]
+		graph_plain2 += cyc2[1]
+		var mm2 := _mismatch_banner_bb_plain(narr)
+		graph_bb2 += mm2[0]
+		graph_plain2 += mm2[1]
+		var j2 := UiReactDockExplainDetailsPresenter.details_append_major(bb, plain, graph_bb2, graph_plain2)
+		bb = j2[0]
+		plain = j2[1]
+
+	var wrj := _append_selected_wire_rule_report_bb_plain(bb, plain)
+	_set_details_both(wrj[0], wrj[1])
+
+
+static func find_first_wire_flow_edge_index_for_rule(
+	layout: Dictionary,
+	rule_index: int,
+	is_edge_visible: Callable = Callable(),
+) -> int:
+	if rule_index < 0:
+		return -1
+	var edges: Array = layout.get(&"draw_edges", []) as Array
+	for i: int in range(edges.size()):
+		var ev: Variant = edges[i]
+		if ev is not Dictionary:
+			continue
+		var ed: Dictionary = ev as Dictionary
+		if int(ed.get(&"kind", -1)) != _SnapScript.EdgeKind.WIRE_FLOW:
+			continue
+		if int(ed.get(&"wire_rule_index", -1)) != rule_index:
+			continue
+		if is_edge_visible.is_valid() and not bool(is_edge_visible.call(i)):
+			continue
+		return i
+	return -1
+
+
+func _find_first_visible_wire_flow_edge_index_for_rule(rule_index: int) -> int:
+	var visible_cb: Callable = Callable()
+	if _graph_view != null and _graph_view.has_method(&"is_edge_index_visible"):
+		visible_cb = func(edge_index: int) -> bool:
+			return bool((_graph_view as Object).call(&"is_edge_index_visible", edge_index))
+	return find_first_wire_flow_edge_index_for_rule(_last_layout, rule_index, visible_cb)
+
+
+func _try_focus_wire_rule_list_from_edge(kind: int, edge_index: int) -> void:
+	if _wire_rules_section == null:
+		return
+	if kind != _SnapScript.EdgeKind.WIRE_FLOW:
+		return
+	var edges: Array = _last_layout.get(&"draw_edges", []) as Array
+	if edge_index < 0 or edge_index >= edges.size():
+		return
+	var ev: Variant = edges[edge_index]
+	if ev is not Dictionary:
+		return
+	var edf: Dictionary = ev as Dictionary
+	var wi := int(edf.get(&"wire_rule_index", -1))
+	if wi >= 0:
+		_wire_rules_section.focus_rule_index(wi)
+
+
+func _short_label_for_node_id(node_id: String) -> String:
+	var nb: Dictionary = _last_layout.get(&"node_by_id", {}) as Dictionary
+	var d: Dictionary = nb.get(node_id, {}) as Dictionary
+	if d.is_empty():
+		return node_id
+	return str(d.get(&"short_label", d.get(&"label", node_id)))
+
+
+func _endpoint_discriminating_plain(node_id: String, peer_id: String) -> String:
+	var short := _short_label_for_node_id(node_id)
+	var peer_short := _short_label_for_node_id(peer_id)
+	if short != peer_short:
+		return short
+	var nb: Dictionary = _last_layout.get(&"node_by_id", {}) as Dictionary
+	var d: Dictionary = nb.get(node_id, {}) as Dictionary
+	var full := str(d.get(&"label", "")).strip_edges()
+	if not full.is_empty() and full != short:
+		return full
+	if node_id.contains("::"):
+		var segs := node_id.split("::")
+		if segs.size() > 0:
+			return String(segs[segs.size() - 1])
+	if node_id.begins_with("state:emb:"):
+		return short
+	return short
+
+
+## Returns [from_bb, from_plain, to_bb, to_plain]; *_bb fragments are wrapped in [code] for embedding.
+func _edge_endpoint_pair_for_summary_bb_plain(from_id: String, to_id: String) -> PackedStringArray:
+	var fs := _short_label_for_node_id(from_id)
+	var ts := _short_label_for_node_id(to_id)
+	if fs != ts:
+		return PackedStringArray(
+			["[code]%s[/code]" % fs, fs, "[code]%s[/code]" % ts, ts]
+		)
+	var fp := _endpoint_discriminating_plain(from_id, to_id)
+	var tp := _endpoint_discriminating_plain(to_id, from_id)
+	var from_plain := fp
+	var to_plain := tp
+	if fp == tp:
+		from_plain = "%s (from)" % fp
+		to_plain = "%s (to)" % tp
+	return PackedStringArray(
+		["[code]%s[/code]" % from_plain, from_plain, "[code]%s[/code]" % to_plain, to_plain]
+	)
+
+
+func _computed_source_slot_phrase_bb_plain(si: int) -> PackedStringArray:
+	if si >= 0:
+		return PackedStringArray(["[code]sources[%d][/code]" % si, "sources[%d]" % si])
+	return PackedStringArray(["[code]sources[?][/code]", "sources[?]"])
+
+
+func _on_focus_inspector_pressed() -> void:
+	if _plugin == null:
+		return
+	var ei := _plugin.get_editor_interface()
+	var root := ei.get_edited_scene_root()
+	if root == null:
+		return
+	if _selection_kind == UiReactDockExplainMenuIds._SEL_NODE and not _graph_selected_node_id.is_empty():
+		_focus_node_in_editor(_graph_selected_node_id, ei, root)
+	elif _selection_kind == UiReactDockExplainMenuIds._SEL_EDGE and _graph_selected_edge_index >= 0:
+		_focus_edge_in_editor(_graph_selected_edge_index, ei, root)
+
+
+func _on_graph_inspector_focus_selection_requested() -> void:
+	_on_focus_inspector_pressed()
+
+
+func _focus_node_in_editor(node_id: String, ei: EditorInterface, root: Node) -> void:
+	if node_id.begins_with("ctrl:"):
+		var path_str := node_id.substr(5)
+		var np := NodePath(path_str)
+		if root.has_node(np):
+			var n: Node = root.get_node(np)
+			if n is Control:
+				ei.get_selection().clear()
+				ei.get_selection().add_node(n)
+				if ei.has_method(&"edit_node"):
+					ei.call(&"edit_node", n as Node)
+				return
+	elif node_id.begins_with("state:"):
+		var nb: Dictionary = _last_layout.get(&"node_by_id", {}) as Dictionary
+		var d: Dictionary = nb.get(node_id, {}) as Dictionary
+		var fp := str(d.get(&"state_file_path", ""))
+		if fp.is_empty():
+			_set_details_both(
+				"[i]Embedded state has no resource file — select the owning [code]UiReact*[/code] control in the Scene tree, then open its state in the Inspector.[/i]",
+				"Embedded state has no resource file — select the owning UiReact* control in the Scene tree, then open its state in the Inspector."
+			)
+			return
+		if ResourceLoader.exists(fp):
+			var res: Resource = load(fp)
+			if res != null and ei.has_method(&"edit_resource"):
+				ei.call(&"edit_resource", res)
+				return
+	_set_details_both(
+		"[i]Could not open this resource in the Inspector.[/i]",
+		"Could not open this resource in the Inspector."
+	)
+
+
+func _focus_edge_in_editor(edge_index: int, ei: EditorInterface, root: Node) -> void:
+	var edges: Array = _last_layout.get(&"draw_edges", []) as Array
+	if edge_index < 0 or edge_index >= edges.size():
+		return
+	var ev: Variant = edges[edge_index]
+	if ev is not Dictionary:
+		return
+	var ed: Dictionary = ev as Dictionary
+	var kind := int(ed.get(&"kind", -1))
+	if kind == _SnapScript.EdgeKind.BINDING:
+		var hp := str(ed.get(&"host_path", ""))
+		if not hp.is_empty() and root.has_node(NodePath(hp)):
+			var n: Node = root.get_node(NodePath(hp))
+			if n is Control:
+				ei.get_selection().clear()
+				ei.get_selection().add_node(n)
+				if ei.has_method(&"edit_node"):
+					ei.call(&"edit_node", n)
+				return
+	elif kind == _SnapScript.EdgeKind.WIRE_FLOW:
+		var wh := str(ed.get(&"wire_host_path", ""))
+		if not wh.is_empty() and root.has_node(NodePath(wh)):
+			var n2: Node = root.get_node(NodePath(wh))
+			if n2 is Control:
+				ei.get_selection().clear()
+				ei.get_selection().add_node(n2)
+				if ei.has_method(&"edit_node"):
+					ei.call(&"edit_node", n2)
+				return
+	elif kind == _SnapScript.EdgeKind.COMPUTED_SOURCE:
+		var to_id := str(ed.get(&"to_id", ""))
+		if not to_id.is_empty():
+			_focus_node_in_editor(to_id, ei, root)
+			return
+
+
+func _on_copy_details_pressed() -> void:
+	if not _last_details_plain.is_empty():
+		DisplayServer.clipboard_set(_last_details_plain)
+
+
+func _editor_richtext_normal_font_size() -> int:
+	if _plugin == null:
+		return 13
+	var t := _DockThemeScript.editor_theme(_plugin)
+	if t != null and t.has_font_size(&"normal_font_size", &"RichTextLabel"):
+		return t.get_font_size(&"normal_font_size", &"RichTextLabel")
+	return 13
+
+
+## Wire payload row labels match editor [Label]; legend **item** labels match [RichTextLabel] body, **group** labels use [method _editor_label_font_size].
+func _editor_label_font_size() -> int:
+	if _plugin == null:
+		return 12
+	var t := _DockThemeScript.editor_theme(_plugin)
+	if t != null and t.has_font_size(&"font_size", &"Label"):
+		return t.get_font_size(&"font_size", &"Label")
+	return 12
+
+
+func _apply_legend_font_sizes() -> void:
+	if _legend_host == null or _plugin == null:
+		return
+	var item_fs := _editor_richtext_normal_font_size()
+	var grp_fs := maxi(_editor_label_font_size() - 1, 10)
+	var status_fs := maxi(item_fs - 1, 10)
+	if _legend_group_nodes_label != null:
+		_legend_group_nodes_label.add_theme_font_size_override(&"font_size", grp_fs)
+		_legend_group_nodes_label.add_theme_color_override(&"font_color", _LEGEND_GROUP_FONT_COLOR)
+	if _legend_group_edges_label != null:
+		_legend_group_edges_label.add_theme_font_size_override(&"font_size", grp_fs)
+		_legend_group_edges_label.add_theme_color_override(&"font_color", _LEGEND_GROUP_FONT_COLOR)
+	if _legend_scope_label != null:
+		_legend_scope_label.add_theme_font_size_override(&"font_size", status_fs)
+		_legend_scope_label.add_theme_color_override(&"font_color", _LEGEND_STATUS_FONT_COLOR)
+	_apply_legend_item_label_font_sizes_recursive(_legend_host, item_fs)
+
+
+func _apply_legend_item_label_font_sizes_recursive(root: Node, item_fs: int) -> void:
+	for ch: Node in root.get_children():
+		if ch is Label:
+			if ch != _legend_group_nodes_label and ch != _legend_group_edges_label and ch != _legend_scope_label:
+				(ch as Label).add_theme_font_size_override(&"font_size", item_fs)
+		_apply_legend_item_label_font_sizes_recursive(ch, item_fs)
+
+
+func _set_legend_scope_from_layout(layout: Dictionary) -> void:
+	if _legend_scope_label == null:
+		return
+	if layout.is_empty():
+		_legend_scope_label.text = "Scope: --"
+		return
+	var stats: Dictionary = layout.get(&"graph_stats", {}) as Dictionary
+	var nodes := int(stats.get(&"node_count", 0))
+	var edges := int(stats.get(&"edge_count", 0))
+	var tr := bool(stats.get(&"truncated", false))
+	_legend_scope_label.text = "Scope: %d nodes · %d edges%s" % [
+		nodes,
+		edges,
+		" (truncated)" if tr else "",
+	]
+
+
+func _apply_graph_body_split_editor_theme() -> void:
+	if _graph_body_split == null or _plugin == null:
+		return
+	_graph_body_split.add_theme_constant_override(&"minimum_grab_thickness", 10)
+	_graph_body_split.add_theme_constant_override(&"autohide", 0)
+	_DockThemeScript.apply_split_bar(_graph_body_split, _plugin)
+
+
+func _restore_graph_body_split_offset() -> void:
+	if _graph_split_restored or _graph_body_split == null:
+		return
+	var off := UiReactDockConfig.get_graph_body_vsplit_offset()
+	if off < 0:
+		_graph_split_restored = true
+		return
+	_graph_split_restore_attempts = 0
+	call_deferred(&"_apply_graph_body_split_offset_clamped", off)
+
+
+## Deferred until [VSplitContainer] has a valid height; see [member _graph_split_restore_attempts].
+func _apply_graph_body_split_offset_clamped(off: int) -> void:
+	if _graph_body_split == null:
+		return
+	var h := int(_graph_body_split.size.y)
+	if h <= 1:
+		_graph_split_restore_attempts += 1
+		if _graph_split_restore_attempts < 12:
+			call_deferred(&"_apply_graph_body_split_offset_clamped", off)
+		else:
+			_graph_split_restored = true
+		return
+	var graph_min := int(_graph_view.custom_minimum_size.y) if _graph_view else 120
+	var col_min := _DETAILS_PANE_MIN_HEIGHT
+	var max_off := maxi(graph_min, h - col_min)
+	var clamped := clampi(off, graph_min, max_off)
+	_graph_body_split.split_offset = clamped
+	_graph_split_restored = true
+	_graph_split_restore_attempts = 0
+
+
+func _on_explain_panel_tree_exiting() -> void:
+	if _graph_body_split == null:
+		return
+	UiReactDockConfig.save_graph_body_vsplit_offset(_graph_body_split.split_offset)
+	if _explain_signal_scope != null:
+		_explain_signal_scope.dispose()
+		_explain_signal_scope = null
+
+
+func _add_legend_edge_sample(
+	row: HBoxContainer, col: Color, line_height_px: float, text: String, tip: String
+) -> void:
+	var inner_h := maxf(2.0, line_height_px)
+	var wrap := Panel.new()
+	wrap.custom_minimum_size = Vector2(30, maxf(8.0, inner_h + 6.0))
+	wrap.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var sb_wrap := StyleBoxFlat.new()
+	sb_wrap.bg_color = _LEGEND_EDGE_SWATCH_BG
+	sb_wrap.set_border_width_all(1)
+	sb_wrap.border_color = _LEGEND_EDGE_SWATCH_BORDER
+	sb_wrap.set_corner_radius_all(2)
+	wrap.add_theme_stylebox_override(&"panel", sb_wrap)
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	wrap.add_child(center)
+	var line := ColorRect.new()
+	line.custom_minimum_size = Vector2(22, inner_h)
+	line.color = col
+	center.add_child(line)
+	row.add_child(wrap)
+	var lab := Label.new()
+	lab.text = text
+	lab.tooltip_text = tip
+	row.add_child(lab)
+
+
+func _add_legend_node_chip(
+	row: HBoxContainer,
+	col: Color,
+	kind: int,
+	text: String,
+	is_focus_host: bool = false,
+	tooltip_text: String = "",
+) -> void:
+	var chip := Panel.new()
+	chip.custom_minimum_size = Vector2(28, 12)
+	chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = col
+	sb.set_corner_radius_all(_ExplainLayoutScript.fill_corner_radius_px(kind))
+	if is_focus_host:
+		sb.set_border_width_all(2)
+		sb.border_color = _ExplainGraphViewScript.GRAPH_LEGEND_FOCUS_BORDER
+	else:
+		sb.set_border_width_all(1)
+		sb.border_color = _LEGEND_NODE_CHIP_BORDER
+	chip.add_theme_stylebox_override(&"panel", sb)
+	row.add_child(chip)
+	var lab := Label.new()
+	lab.text = text
+	lab.tooltip_text = tooltip_text
+	row.add_child(lab)
+
+
+func _clamp_layout_caps() -> void:
+	_layout_max_nodes = clampi(_layout_max_nodes, _SCOPE_MIN_NODES, _SCOPE_MAX_NODES)
+	_layout_max_edges = clampi(_layout_max_edges, _SCOPE_MIN_EDGES, _SCOPE_MAX_EDGES)
+
+
+func _default_scope_dict() -> Dictionary:
+	return {
+		&"name": "",
+		&"max_nodes": 200,
+		&"max_edges": 400,
+		&"show_binding": true,
+		&"show_computed": true,
+		&"show_wire": true,
+		&"show_all_edge_labels": false,
+		&"full_lists": false,
+		&"pinned": PackedStringArray(),
+		&"about": "",
+	}
+
+
+func _preset_from_variant(v: Variant) -> Dictionary:
+	var d := _default_scope_dict()
+	if v is not Dictionary:
+		return d
+	var src: Dictionary = v as Dictionary
+	var n := String(src.get("name", "")).strip_edges()
+	d[&"name"] = n
+	d[&"max_nodes"] = clampi(int(src.get("max_nodes", 200)), _SCOPE_MIN_NODES, _SCOPE_MAX_NODES)
+	d[&"max_edges"] = clampi(int(src.get("max_edges", 400)), _SCOPE_MIN_EDGES, _SCOPE_MAX_EDGES)
+	d[&"show_binding"] = bool(src.get("show_binding", true))
+	d[&"show_computed"] = bool(src.get("show_computed", true))
+	d[&"show_wire"] = bool(src.get("show_wire", true))
+	d[&"show_all_edge_labels"] = bool(src.get("show_all_edge_labels", false))
+	d[&"full_lists"] = bool(src.get("full_lists", false))
+	d[&"about"] = String(src.get("about", src.get(&"about", ""))).strip_edges()
+	var pins: Variant = src.get("pinned", PackedStringArray())
+	var ps: PackedStringArray = PackedStringArray()
+	if pins is Array:
+		for it in pins as Array:
+			var s := String(it).strip_edges()
+			if not s.is_empty():
+				ps.append(s)
+	elif pins is PackedStringArray:
+		ps = pins as PackedStringArray
+	var seen_pin: Dictionary = {}
+	var deduped: PackedStringArray = PackedStringArray()
+	for i in range(ps.size()):
+		var pid := String(ps[i]).strip_edges()
+		if pid.is_empty() or seen_pin.has(pid):
+			continue
+		seen_pin[pid] = true
+		deduped.append(pid)
+	d[&"pinned"] = deduped
+	return d
+
+
+func _capture_current_scope_settings(preset_name: String) -> Dictionary:
+	var pins_copy: PackedStringArray = PackedStringArray()
+	for i in range(_pinned_node_ids.size()):
+		pins_copy.append(String(_pinned_node_ids[i]))
+	return {
+		&"name": preset_name,
+		&"max_nodes": _layout_max_nodes,
+		&"max_edges": _layout_max_edges,
+		&"show_binding": _cb_bind != null and _cb_bind.button_pressed,
+		&"show_computed": _cb_computed != null and _cb_computed.button_pressed,
+		&"show_wire": _cb_wire != null and _cb_wire.button_pressed,
+		&"show_all_edge_labels": _cb_edge_labels != null and _cb_edge_labels.button_pressed,
+		&"full_lists": _show_full_lists,
+		&"pinned": pins_copy,
+		&"about": "",
+	}
+
+
+func _apply_scope_dict_to_ui(d: Dictionary) -> void:
+	_layout_max_nodes = clampi(int(d.get("max_nodes", 200)), _SCOPE_MIN_NODES, _SCOPE_MAX_NODES)
+	_layout_max_edges = clampi(int(d.get("max_edges", 400)), _SCOPE_MIN_EDGES, _SCOPE_MAX_EDGES)
+	if _cb_bind:
+		_cb_bind.button_pressed = bool(d.get("show_binding", true))
+	if _cb_computed:
+		_cb_computed.button_pressed = bool(d.get("show_computed", true))
+	if _cb_wire:
+		_cb_wire.button_pressed = bool(d.get("show_wire", true))
+	if _cb_edge_labels:
+		_cb_edge_labels.button_pressed = bool(d.get("show_all_edge_labels", false))
+	var fl := bool(d.get("full_lists", false))
+	_show_full_lists = fl
+	if _cb_full_lists:
+		_cb_full_lists.button_pressed = fl
+	var pv: Variant = d.get("pinned", PackedStringArray())
+	if pv is PackedStringArray:
+		_pinned_node_ids = pv
+	elif pv is Array:
+		_pinned_node_ids = PackedStringArray()
+		for it in pv as Array:
+			var s := String(it).strip_edges()
+			if not s.is_empty():
+				_pinned_node_ids.append(s)
+	else:
+		_pinned_node_ids = PackedStringArray()
+	_clamp_layout_caps()
+	if _graph_view != null:
+		_push_visual_filters()
+
+
+func _rebuild_scope_preset_dropdown() -> void:
+	if _scope_preset_option == null:
+		return
+	_scope_preset_block_select = true
+	_scope_preset_option.clear()
+	_scope_preset_option.add_item("Default")
+	_scope_preset_option.set_item_metadata(0, "")
+	_scope_presets_cache = UiReactDockExplainScopePresets.load_sorted_presets_raw()
+	var names: Array[String] = []
+	for it: Variant in _scope_presets_cache:
+		if it is Dictionary:
+			var nm := String((it as Dictionary).get("name", "")).strip_edges()
+			if not nm.is_empty() and nm.to_lower() != "default":
+				names.append(nm)
+	names.sort()
+	var idx := 1
+	for nm2 in names:
+		_scope_preset_option.add_item(nm2)
+		_scope_preset_option.set_item_metadata(idx, nm2)
+		idx += 1
+	_scope_preset_block_select = false
+
+
+func _sync_active_scope_preset_from_settings(_select_dropdown: bool) -> void:
+	_rebuild_scope_preset_dropdown()
+	var active: String = String(UiReactDockConfig.get_active_graph_scope_preset_name()).strip_edges()
+	if active.is_empty() or active.to_lower() == "default":
+		_apply_scope_dict_to_ui(_default_scope_dict())
+		_sync_hidden_preset_option_index()
+		return
+	var found: Dictionary = {}
+	for it: Variant in _scope_presets_cache:
+		if it is Dictionary:
+			var pd: Dictionary = _preset_from_variant(it)
+			if String(pd.get("name", "")) == active:
+				found = pd
+				break
+	if found.is_empty():
+		_apply_scope_dict_to_ui(_default_scope_dict())
+		UiReactDockConfig.set_active_graph_scope_preset_name("")
+		_sync_hidden_preset_option_index()
+		return
+	_apply_scope_dict_to_ui(found)
+	_sync_hidden_preset_option_index()
+
+
+func _persist_presets_array(arr: Array) -> void:
+	UiReactDockConfig.save_graph_scope_presets_raw(arr)
+	_rebuild_scope_preset_dropdown()
+
+
+func _on_scope_preset_selected(index: int) -> void:
+	if _scope_preset_block_select or _scope_preset_option == null:
+		return
+	var meta: Variant = _scope_preset_option.get_item_metadata(index)
+	_apply_scope_preset_by_name(str(meta).strip_edges())
+
+
+func _on_scope_save_as_pressed() -> void:
+	if _scope_save_name_dialog == null or _scope_save_name_edit == null:
+		return
+	_pin_pending_after_save = false
+	_pin_target_id_pending_after_save = ""
+	_scope_save_name_dialog.title = "Save scope preset"
+	_scope_save_name_dialog.dialog_text = ""
+	_scope_save_name_edit.text = ""
+	if _scope_save_about_edit != null:
+		_scope_save_about_edit.text = ""
+	_scope_save_name_dialog.popup_centered()
+
+
+func _commit_upsert_preset_activate(rec: Dictionary) -> void:
+	var raw_name := String(rec.get(&"name", "")).strip_edges()
+	if raw_name.is_empty() or raw_name.to_lower() == "default":
+		push_warning(
+			"Ui React: enter a non-empty scope preset name that is not “Default”, then confirm Save."
+		)
+		return
+	var arr: Array = UiReactDockExplainScopePresets.load_sorted_presets_raw()
+	var replaced := false
+	var out: Array = []
+	for it: Variant in arr:
+		if it is Dictionary:
+			var old: Dictionary = _preset_from_variant(it)
+			if String(old.get("name", "")) == raw_name:
+				out.append(rec)
+				replaced = true
+			else:
+				out.append(old)
+	if not replaced:
+		out.append(rec)
+	_persist_presets_array(out)
+	UiReactDockConfig.set_active_graph_scope_preset_name(raw_name)
+	_sync_active_scope_preset_from_settings(true)
+	refresh()
+
+
+func _on_scope_save_name_canceled() -> void:
+	_pin_pending_after_save = false
+	_pin_target_id_pending_after_save = ""
+	if _scope_save_about_edit != null:
+		_scope_save_about_edit.text = ""
+	if _scope_save_name_dialog:
+		_scope_save_name_dialog.title = "Save scope preset"
+		_scope_save_name_dialog.dialog_text = ""
+
+
+func _on_scope_save_name_confirmed() -> void:
+	var raw_name := _scope_save_name_edit.text.strip_edges() if _scope_save_name_edit else ""
+	if raw_name.is_empty() or raw_name.to_lower() == "default":
+		push_warning(
+			"Ui React: enter a non-empty scope preset name that is not “Default”, then confirm Save."
+		)
+		return
+	var rec := _capture_current_scope_settings(raw_name)
+	if _scope_save_about_edit != null:
+		rec[&"about"] = String(_scope_save_about_edit.text).strip_edges()
+	if _pin_pending_after_save:
+		_pin_pending_after_save = false
+		var sid := String(_pin_target_id_pending_after_save).strip_edges()
+		if sid.is_empty():
+			sid = _resolve_pin_target_graph_node_id()
+		_pin_target_id_pending_after_save = ""
+		if not sid.is_empty():
+			var pins: PackedStringArray = PackedStringArray()
+			var pins_v: Variant = rec.get(&"pinned", PackedStringArray())
+			if pins_v is PackedStringArray:
+				pins = (pins_v as PackedStringArray).duplicate()
+			elif pins_v is Array:
+				for it in pins_v as Array:
+					var ps := String(it).strip_edges()
+					if not ps.is_empty():
+						pins.append(ps)
+			var seen: Dictionary = {}
+			for i in range(pins.size()):
+				seen[pins[i]] = true
+			if not seen.has(sid):
+				pins.append(sid)
+				rec[&"pinned"] = pins
+	if _scope_save_name_dialog:
+		_scope_save_name_dialog.title = "Save scope preset"
+		_scope_save_name_dialog.dialog_text = ""
+	if _scope_save_about_edit != null:
+		_scope_save_about_edit.text = ""
+	_commit_upsert_preset_activate(rec)
+
+
+func _on_scope_manage_pressed() -> void:
+	if _scope_manage_list == null or _scope_manage_dialog == null:
+		return
+	_scope_manage_list.clear()
+	for it: Variant in UiReactDockExplainScopePresets.load_sorted_presets_raw():
+		if it is not Dictionary:
+			continue
+		var d: Dictionary = it as Dictionary
+		var nm := String(d.get("name", "")).strip_edges()
+		if nm.is_empty():
+			continue
+		_scope_manage_list.add_item(nm)
+		var li := _scope_manage_list.item_count - 1
+		var abt := String(d.get("about", d.get(&"about", ""))).strip_edges()
+		if abt.is_empty():
+			_scope_manage_list.set_item_tooltip(li, "No notes saved for this preset.")
+		else:
+			_scope_manage_list.set_item_tooltip(li, abt)
+	_scope_manage_dialog.popup_centered()
+
+
+func _on_scope_manage_delete_pressed() -> void:
+	if _scope_manage_list == null:
+		return
+	var sel: PackedInt32Array = _scope_manage_list.get_selected_items()
+	if sel.is_empty():
+		return
+	var del_name := _scope_manage_list.get_item_text(sel[0])
+	var arr: Array = UiReactDockExplainScopePresets.load_sorted_presets_raw()
+	var out: Array = []
+	for it: Variant in arr:
+		if it is Dictionary:
+			var nm := String((it as Dictionary).get("name", "")).strip_edges()
+			if nm != del_name:
+				out.append(_preset_from_variant(it))
+	_persist_presets_array(out)
+	if UiReactDockConfig.get_active_graph_scope_preset_name() == del_name:
+		UiReactDockConfig.set_active_graph_scope_preset_name("")
+	_sync_active_scope_preset_from_settings(true)
+	_on_scope_manage_pressed()
+	refresh()
+
+
+func _on_create_state_menu_id(menu_id: int) -> void:
+	var names: PackedStringArray = _GraphFactoryScript.factory_state_class_names()
+	if menu_id < 0 or menu_id >= names.size():
+		return
+	_create_state_class_pending = String(names[menu_id])
+	_create_and_assign_mode = false
+	_popup_create_state_save_dialog(false)
+
+
+func _on_create_assign_binding_pressed() -> void:
+	if not _can_create_and_assign_binding_edge():
+		return
+	var ei := _plugin.get_editor_interface()
+	var root := ei.get_edited_scene_root()
+	if root == null:
+		return
+	var edges: Array = _last_layout.get(&"draw_edges", []) as Array
+	var idx := _graph_selected_edge_index
+	if idx < 0 or idx >= edges.size():
+		return
+	var ed: Dictionary = edges[idx] as Dictionary
+	var hp := str(ed.get(&"host_path", ""))
+	var bp := str(ed.get(&"binding_property", ""))
+	if bp.is_empty():
+		bp = str(ed.get(&"label", ""))
+	var host: Node = root.get_node(NodePath(hp))
+	if not (host is Control):
+		return
+	var host_c := host as Control
+	var comp := UiReactScannerService.get_component_name_from_script(host_c.get_script() as Script)
+	var prop_sn := StringName(bp)
+	var kind := ""
+	var bindings: Array = UiReactComponentRegistry.BINDINGS_BY_COMPONENT.get(comp, [])
+	for b in bindings:
+		if b.get("property", &"") == prop_sn:
+			kind = str(b.get("kind", ""))
+			break
+	var expected := UiReactBindingValidator._expected_binding_state_class(comp, prop_sn, kind, host_c)
+	_create_assign_host_path = hp
+	_create_assign_prop = prop_sn
+	_create_assign_component = comp
+	_create_assign_expected_class = expected
+	_create_state_class_pending = String(expected)
+	_create_and_assign_mode = true
+	_popup_create_state_save_dialog(true)
+
+
+func _popup_create_state_save_dialog(_for_assign: bool) -> void:
+	var dlg := _ensure_create_state_save_dialog()
+	var out_dir := _GraphFactoryScript.output_dir_from_project_settings()
+	var err := UiReactStateFactoryService.ensure_output_dir(out_dir)
+	if err != OK:
+		push_error(
+			"Ui React: could not create the state output folder %s. Fix the path in dock settings and try Create again." % out_dir
+		)
+		return
+	var base_node := "state"
+	var base_prop := ""
+	if _for_assign and not _create_assign_host_path.is_empty():
+		var root := _plugin.get_editor_interface().get_edited_scene_root()
+		if root != null and root.has_node(NodePath(_create_assign_host_path)):
+			var hn: Node = root.get_node(NodePath(_create_assign_host_path))
+			base_node = str(hn.name)
+			base_prop = str(_create_assign_prop)
+	var path := _GraphFactoryScript.suggest_state_save_path(
+		_create_state_class_pending, out_dir, base_node, base_prop
+	)
+	if _for_assign and not _create_assign_prop.is_empty():
+		dlg.title = "Save new %s for %s.%s" % [
+			_create_state_class_pending,
+			base_node,
+			String(_create_assign_prop),
+		]
+	else:
+		dlg.title = "Save new %s" % _create_state_class_pending
+	dlg.current_path = path
+	dlg.popup_centered_ratio(0.55)
+
+
+func _ensure_create_state_save_dialog() -> EditorFileDialog:
+	if _create_state_save_dialog != null:
+		return _create_state_save_dialog
+	var dlg := EditorFileDialog.new()
+	dlg.file_mode = EditorFileDialog.FILE_MODE_SAVE_FILE
+	dlg.access = EditorFileDialog.ACCESS_RESOURCES
+	dlg.add_filter("*.tres", "Resource")
+	_explain_signal_scope.connect_bound(dlg.file_selected, _on_create_state_file_selected)
+	_plugin.get_editor_interface().get_base_control().add_child(dlg)
+	_create_state_save_dialog = dlg
+	return dlg
+
+
+func _on_create_state_file_selected(path: String) -> void:
+	var cls := _create_state_class_pending
+	_create_state_class_pending = ""
+	var assign_mode := _create_and_assign_mode
+	_create_and_assign_mode = false
+	if cls.is_empty() or _plugin == null:
+		return
+	var loaded := _GraphFactoryScript.save_new_state_at_path(StringName(cls), path)
+	if loaded == null:
+		push_error(
+			"Ui React: failed to save the new state file. Check the folder is writable and the name is valid, then retry."
+		)
+		return
+	if not (loaded is UiState):
+		push_error(
+			"Ui React: the file saved but is not a UiState. Pick a supported state class from the Create menu."
+		)
+		return
+	var ui_st := loaded as UiState
+	if assign_mode:
+		if _actions == null:
+			return
+		var root := _plugin.get_editor_interface().get_edited_scene_root()
+		if root == null or not root.has_node(NodePath(_create_assign_host_path)):
+			return
+		var hn: Node = root.get_node(NodePath(_create_assign_host_path))
+		if not (hn is Control):
+			return
+		if not UiReactGraphNewBindingService.try_commit_assign(
+			hn as Control, _create_assign_component, _create_assign_prop, ui_st, _actions
+		):
+			push_warning(
+				"Ui React: create and assign failed because the binding type or slot no longer matches. Rescan and confirm the empty binding edge, then retry."
+			)
+			return
+	_create_assign_host_path = ""
+	_create_assign_prop = &""
+	_create_assign_component = ""
+	_create_assign_expected_class = &""
+	_plugin.get_editor_interface().get_resource_filesystem().scan()
+	if _request_dock_refresh.is_valid():
+		_request_dock_refresh.call()
+	refresh()
+
+
+func _can_create_and_assign_binding_edge() -> bool:
+	if _plugin == null or _actions == null:
+		return false
+	if _selection_kind != UiReactDockExplainMenuIds._SEL_EDGE or _last_edge_kind != _SnapScript.EdgeKind.BINDING:
+		return false
+	var ei := _plugin.get_editor_interface()
+	var root := ei.get_edited_scene_root()
+	if root == null:
+		return false
+	var edges: Array = _last_layout.get(&"draw_edges", []) as Array
+	var idx := _graph_selected_edge_index
+	if idx < 0 or idx >= edges.size():
+		return false
+	var ed: Dictionary = edges[idx] as Dictionary
+	if not _edge_allows_binding_rebind(ed, root):
+		return false
+	var hp := str(ed.get(&"host_path", ""))
+	var bp := str(ed.get(&"binding_property", ""))
+	if bp.is_empty():
+		bp = str(ed.get(&"label", ""))
+	if hp.is_empty() or bp.is_empty():
+		return false
+	if not root.has_node(NodePath(hp)):
+		return false
+	var n: Node = root.get_node(NodePath(hp))
+	if not (n is Control):
+		return false
+	var host := n as Control
+	var comp := UiReactScannerService.get_component_name_from_script(host.get_script() as Script)
+	if comp.is_empty():
+		return false
+	var prop_sn := StringName(bp)
+	if not UiReactGraphNewBindingService.binding_export_is_optional(comp, prop_sn):
+		return false
+	if host.get(prop_sn) != null:
+		return false
+	var kind := ""
+	var bindings: Array = UiReactComponentRegistry.BINDINGS_BY_COMPONENT.get(comp, [])
+	for b in bindings:
+		if b.get("property", &"") == prop_sn:
+			kind = str(b.get("kind", ""))
+			break
+	var expected := UiReactBindingValidator._expected_binding_state_class(comp, prop_sn, kind, host)
+	if not _GraphFactoryScript.is_factory_supported_class(String(expected)):
+		return false
+	return true
+
+
+func _build_ui() -> void:
+	set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_theme_constant_override(&"margin_left", 8)
+	add_theme_constant_override(&"margin_right", 8)
+	add_theme_constant_override(&"margin_top", 8)
+	add_theme_constant_override(&"margin_bottom", 8)
+
+	var v := VBoxContainer.new()
+	v.set_anchors_preset(Control.PRESET_FULL_RECT)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	add_child(v)
+
+	_hint = RichTextLabel.new()
+	_hint.bbcode_enabled = true
+	_hint.fit_content = false
+	_hint.scroll_active = false
+	_hint.custom_minimum_size = Vector2(0, 36)
+	_hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_hint.visible = false
+	v.add_child(_hint)
+
+	_auto_refresh_timer = Timer.new()
+	_auto_refresh_timer.wait_time = 0.15
+	_auto_refresh_timer.one_shot = true
+	_explain_signal_scope.connect_bound(_auto_refresh_timer.timeout, _on_debounced_auto_refresh)
+	add_child(_auto_refresh_timer)
+
+	_hidden_chrome_host = Control.new()
+	_hidden_chrome_host.visible = false
+	_hidden_chrome_host.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hidden_chrome_host.custom_minimum_size = Vector2.ZERO
+	v.add_child(_hidden_chrome_host)
+
+	_scope_preset_option = OptionButton.new()
+	_scope_preset_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_scope_preset_option.tooltip_text = (
+		"Scope preset selector: layout caps, filters, and pinned nodes (project settings)."
+	)
+	_explain_signal_scope.connect_bound(_scope_preset_option.item_selected, _on_scope_preset_selected)
+	_hidden_chrome_host.add_child(_scope_preset_option)
+
+	_cb_full_lists = CheckBox.new()
+	_cb_full_lists.text = "Full lists"
+	_cb_full_lists.tooltip_text = "Uncap upstream/downstream lines in the details pane."
+	_cb_full_lists.button_pressed = false
+	_explain_signal_scope.connect_bound(_cb_full_lists.toggled, _on_full_lists_toggled)
+	_hidden_chrome_host.add_child(_cb_full_lists)
+
+	_cb_bind = CheckBox.new()
+	_cb_bind.text = "Binding"
+	_cb_bind.button_pressed = true
+	_cb_bind.tooltip_text = "Toggle binding edges (state → control property)."
+	_explain_signal_scope.connect_bound(_cb_bind.toggled, func(_on: bool) -> void: _push_visual_filters())
+	_hidden_chrome_host.add_child(_cb_bind)
+
+	_cb_computed = CheckBox.new()
+	_cb_computed.text = "Computed"
+	_cb_computed.button_pressed = true
+	_cb_computed.tooltip_text = "Toggle computed-source edges."
+	_explain_signal_scope.connect_bound(_cb_computed.toggled, func(_on2: bool) -> void: _push_visual_filters())
+	_hidden_chrome_host.add_child(_cb_computed)
+
+	_cb_wire = CheckBox.new()
+	_cb_wire.text = "Wire"
+	_cb_wire.button_pressed = true
+	_cb_wire.tooltip_text = "Toggle wire-rule flow edges."
+	_explain_signal_scope.connect_bound(_cb_wire.toggled, func(_on3: bool) -> void: _push_visual_filters())
+	_hidden_chrome_host.add_child(_cb_wire)
+
+	_cb_edge_labels = CheckBox.new()
+	_cb_edge_labels.text = "All edge labels"
+	_cb_edge_labels.button_pressed = false
+	_cb_edge_labels.tooltip_text = "Short labels on every edge; selection still expands below."
+	_explain_signal_scope.connect_bound(_cb_edge_labels.toggled, func(_on4: bool) -> void: _push_visual_filters())
+	_hidden_chrome_host.add_child(_cb_edge_labels)
+
+	_scope_save_name_dialog = AcceptDialog.new()
+	_scope_save_name_dialog.title = "Save scope preset"
+	_scope_save_name_dialog.ok_button_text = "Save"
+	var svb := VBoxContainer.new()
+	_scope_save_name_edit = LineEdit.new()
+	_scope_save_name_edit.placeholder_text = "Preset name (not “Default”)"
+	_scope_save_name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	svb.add_child(_scope_save_name_edit)
+	var about_lab := Label.new()
+	about_lab.text = "Description (optional)"
+	svb.add_child(about_lab)
+	_scope_save_about_edit = TextEdit.new()
+	_scope_save_about_edit.placeholder_text = "Shown as tooltip when hovering this preset in menus."
+	_scope_save_about_edit.custom_minimum_size = Vector2(0, 72)
+	_scope_save_about_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_scope_save_about_edit.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
+	svb.add_child(_scope_save_about_edit)
+	_scope_save_name_dialog.add_child(svb)
+	_explain_signal_scope.connect_bound(_scope_save_name_dialog.confirmed, _on_scope_save_name_confirmed)
+	_explain_signal_scope.connect_bound(_scope_save_name_dialog.canceled, _on_scope_save_name_canceled)
+	add_child(_scope_save_name_dialog)
+
+	_scope_manage_dialog = AcceptDialog.new()
+	_scope_manage_dialog.title = "Manage scope presets"
+	_scope_manage_dialog.ok_button_text = "Close"
+	var mvb := VBoxContainer.new()
+	_scope_manage_list = ItemList.new()
+	_scope_manage_list.custom_minimum_size = Vector2(0, 120)
+	_scope_manage_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mvb.add_child(_scope_manage_list)
+	var del_btn := Button.new()
+	del_btn.text = "Delete selected"
+	_explain_signal_scope.connect_bound(del_btn.pressed, _on_scope_manage_delete_pressed)
+	mvb.add_child(del_btn)
+	_scope_manage_dialog.add_child(mvb)
+	add_child(_scope_manage_dialog)
+
+	_visual_host = VBoxContainer.new()
+	_visual_host.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_visual_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_visual_host.custom_minimum_size = Vector2(0, 220)
+	v.add_child(_visual_host)
+
+	_legend_host = VBoxContainer.new()
+	_legend_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_legend_host.add_theme_constant_override(&"separation", 6)
+	_legend_host.visible = true
+	_visual_host.add_child(_legend_host)
+
+	_legend_nodes_row = HBoxContainer.new()
+	_legend_nodes_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_legend_nodes_row.add_theme_constant_override(&"separation", 8)
+	_legend_group_nodes_label = Label.new()
+	_legend_group_nodes_label.text = "Nodes"
+	_legend_nodes_row.add_child(_legend_group_nodes_label)
+
+	_add_legend_node_chip(
+		_legend_nodes_row,
+		_ExplainGraphViewScript.GRAPH_NODE_FILL_FOCUS_HOST,
+		_SnapScript.NodeKind.CONTROL,
+		"Focus control",
+		true,
+		"The control you picked when refreshing; the layout is centered on it."
+	)
+	_add_legend_node_chip(
+		_legend_nodes_row,
+		_ExplainGraphViewScript.GRAPH_NODE_FILL_CONTROL,
+		_SnapScript.NodeKind.CONTROL,
+		"Control",
+		false,
+		"Other Ui React controls that appear in this scoped graph."
+	)
+	_add_legend_node_chip(
+		_legend_nodes_row,
+		_ExplainGraphViewScript.GRAPH_NODE_FILL_STATE,
+		_SnapScript.NodeKind.UI_STATE,
+		"State",
+		false,
+		"State resources wired to controls, wire rules, or computed nodes."
+	)
+	_add_legend_node_chip(
+		_legend_nodes_row,
+		_ExplainGraphViewScript.GRAPH_NODE_FILL_COMPUTED,
+		_SnapScript.NodeKind.UI_COMPUTED,
+		"Computed",
+		false,
+		"Computed resources that combine other states (shown as their own nodes)."
+	)
+
+	_legend_edges_row = HBoxContainer.new()
+	_legend_edges_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_legend_edges_row.add_theme_constant_override(&"separation", 8)
+	_legend_group_edges_label = Label.new()
+	_legend_group_edges_label.text = "Edges"
+	_legend_edges_row.add_child(_legend_group_edges_label)
+	_add_legend_edge_sample(
+		_legend_edges_row,
+		_ExplainGraphViewScript.GRAPH_EDGE_COLOR_BINDING,
+		3.0,
+		"Binding",
+		"Inspector binding export: state feeds a control property."
+	)
+	_add_legend_edge_sample(
+		_legend_edges_row,
+		_ExplainGraphViewScript.GRAPH_EDGE_COLOR_COMPUTED,
+		3.0,
+		"Computed src",
+		"Computed input: an upstream state feeds into a computed resource."
+	)
+	_add_legend_edge_sample(
+		_legend_edges_row,
+		_ExplainGraphViewScript.GRAPH_EDGE_COLOR_WIRE,
+		4.0,
+		"Wire",
+		"Wire rule row: inputs on the rule drive its outputs."
+	)
+	_legend_scope_spacer = Control.new()
+	_legend_scope_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_legend_edges_row.add_child(_legend_scope_spacer)
+	_legend_scope_label = Label.new()
+	_legend_scope_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_legend_scope_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_legend_scope_label.text = "Scope: --"
+	_legend_scope_label.tooltip_text = "How many nodes and edges are drawn after caps and filters."
+	_legend_edges_row.add_child(_legend_scope_label)
+
+	_legend_host.add_child(_legend_nodes_row)
+	_legend_host.add_child(_legend_edges_row)
+
+	_graph_view = _ExplainGraphViewScript.new()
+	_graph_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_graph_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_graph_view.custom_minimum_size = Vector2(160, 140)
+	_explain_signal_scope.connect_bound(_graph_view.node_selected, _on_graph_node)
+	_explain_signal_scope.connect_bound(_graph_view.edge_selected, _on_graph_edge)
+	_explain_signal_scope.connect_bound(_graph_view.inspector_focus_selection_requested, _on_graph_inspector_focus_selection_requested)
+	_explain_signal_scope.connect_bound(_graph_view.selection_cleared, _on_graph_cleared)
+	_explain_signal_scope.connect_bound(_graph_view.reconnect_drag_ended, _on_graph_reconnect_drag_ended)
+	_explain_signal_scope.connect_bound(_graph_view.newlink_drag_ended, _on_graph_newlink_drag_ended)
+	_explain_signal_scope.connect_bound(_graph_view.edge_disconnect_requested, _on_graph_edge_disconnect_requested)
+	_explain_signal_scope.connect_bound(_graph_view.context_menu_requested, _on_graph_context_menu_requested)
+	_explain_signal_scope.connect_bound(_graph_view.canvas_view_menu_requested, _on_canvas_view_menu_requested)
+	_graph_view.set_reconnect_handlers(
+		Callable(self, &"_reconnect_can_start_cb"),
+		Callable(self, &"_reconnect_is_valid_target_cb")
+	)
+	_graph_view.set_newlink_handlers(
+		Callable(self, &"_newlink_can_start_cb"),
+		Callable(self, &"_newlink_is_valid_drop_cb")
+	)
+	_graph_view.tooltip_text = ""
+
+	_graph_body_split = VSplitContainer.new()
+	_graph_body_split.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_graph_body_split.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_graph_body_split.custom_minimum_size = Vector2(0, 220)
+	_graph_body_split.tooltip_text = "Drag to resize the graph and lower pane (rules list + details)."
+	_visual_host.add_child(_graph_body_split)
+	_graph_body_split.add_child(_graph_view)
+
+	_below_graph_column = VBoxContainer.new()
+	_below_graph_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_below_graph_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_graph_body_split.add_child(_below_graph_column)
+
+	_wire_rules_section = _WireRulesSectionScript.new()
+	_wire_rules_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_wire_rules_section.setup(
+		_plugin,
+		_actions,
+		Callable(self, &"_after_wire_rules_section_commit"),
+	)
+	if _wire_rules_section.has_signal(&"rule_selection_changed"):
+		_explain_signal_scope.connect_bound(_wire_rules_section.rule_selection_changed, _on_wire_rule_list_selection_changed)
+	_below_graph_column.add_child(_wire_rules_section)
+
+	_details = RichTextLabel.new()
+	_details.bbcode_enabled = true
+	_details.scroll_active = true
+	_details.fit_content = false
+	_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_details.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_details.custom_minimum_size = Vector2(0, _DETAILS_PANE_MIN_HEIGHT)
+	_details.tooltip_text = "Details for the selected graph item."
+	_details.clip_contents = true
+	_below_graph_column.add_child(_details)
+	_set_details_placeholder()
+
+	var base_ctl := _plugin.get_editor_interface().get_base_control()
+	_selection_actions_context_popup = PopupMenu.new()
+	_selection_actions_context_popup.name = "SelectionActionsContextPopup"
+	base_ctl.add_child(_selection_actions_context_popup)
+	_explain_signal_scope.connect_bound(_selection_actions_context_popup.id_pressed, _on_selection_action_id)
+	_selection_node_submenu_popup = PopupMenu.new()
+	_selection_node_submenu_popup.name = "SelectionNodeSubmenu"
+	_selection_actions_context_popup.add_child(_selection_node_submenu_popup)
+	_explain_signal_scope.connect_bound(_selection_node_submenu_popup.id_pressed, _on_selection_node_submenu_id)
+	_selection_wire_submenu_popup = PopupMenu.new()
+	_selection_wire_submenu_popup.name = "SelectionWireSubmenu"
+	_selection_actions_context_popup.add_child(_selection_wire_submenu_popup)
+	_explain_signal_scope.connect_bound(_selection_wire_submenu_popup.id_pressed, _on_selection_wire_submenu_id)
+	_selection_wire_add_rule_submenu_popup = PopupMenu.new()
+	_selection_wire_add_rule_submenu_popup.name = "SelectionWireAddRuleSubmenu"
+	_selection_wire_submenu_popup.add_child(_selection_wire_add_rule_submenu_popup)
+	_explain_signal_scope.connect_bound(_selection_wire_add_rule_submenu_popup.id_pressed, _on_selection_wire_submenu_id)
+	_selection_wire_stacks_submenu_popup = PopupMenu.new()
+	_selection_wire_stacks_submenu_popup.name = "SelectionWireStacksSubmenu"
+	_selection_wire_submenu_popup.add_child(_selection_wire_stacks_submenu_popup)
+	_explain_signal_scope.connect_bound(_selection_wire_stacks_submenu_popup.id_pressed, _on_selection_wire_submenu_id)
+	_selection_edge_edit_submenu_popup = PopupMenu.new()
+	_selection_edge_edit_submenu_popup.name = "SelectionEdgeEditSubmenu"
+	_selection_actions_context_popup.add_child(_selection_edge_edit_submenu_popup)
+	_explain_signal_scope.connect_bound(_selection_edge_edit_submenu_popup.id_pressed, _on_selection_edge_edit_submenu_id)
+	_selection_create_bind_submenu_popup = PopupMenu.new()
+	_selection_create_bind_submenu_popup.name = "SelectionCreateBindSubmenu"
+	_selection_actions_context_popup.add_child(_selection_create_bind_submenu_popup)
+	_explain_signal_scope.connect_bound(_selection_create_bind_submenu_popup.id_pressed, _on_selection_create_bind_submenu_id)
+	_canvas_view_context_popup = PopupMenu.new()
+	_canvas_view_context_popup.name = "CanvasViewContextPopup"
+	base_ctl.add_child(_canvas_view_context_popup)
+	_explain_signal_scope.connect_bound(_canvas_view_context_popup.id_pressed, _on_canvas_view_menu_id)
+	_canvas_create_submenu_popup = PopupMenu.new()
+	_canvas_create_submenu_popup.name = "CanvasCreateSubmenu"
+	_canvas_view_context_popup.add_child(_canvas_create_submenu_popup)
+	_explain_signal_scope.connect_bound(_canvas_create_submenu_popup.id_pressed, _on_canvas_create_submenu_id)
+	_canvas_view_submenu_popup = PopupMenu.new()
+	_canvas_view_submenu_popup.name = "CanvasViewSubmenu"
+	_canvas_view_context_popup.add_child(_canvas_view_submenu_popup)
+	_explain_signal_scope.connect_bound(_canvas_view_submenu_popup.id_pressed, _on_canvas_view_submenu_id)
+	_canvas_scope_submenu_popup = PopupMenu.new()
+	_canvas_scope_submenu_popup.name = "CanvasScopeSubmenu"
+	_canvas_view_context_popup.add_child(_canvas_scope_submenu_popup)
+	_canvas_scope_presets_popup = PopupMenu.new()
+	_canvas_scope_presets_popup.name = "CanvasScopePresetsList"
+	_canvas_scope_submenu_popup.add_child(_canvas_scope_presets_popup)
+	_explain_signal_scope.connect_bound(_canvas_scope_presets_popup.id_pressed, _on_scope_presets_list_id)
+	_explain_signal_scope.connect_bound(_canvas_scope_submenu_popup.id_pressed, _on_scope_actions_submenu_id)
+	_selection_scope_submenu_popup = PopupMenu.new()
+	_selection_scope_submenu_popup.name = "SelectionScopeSubmenu"
+	_selection_actions_context_popup.add_child(_selection_scope_submenu_popup)
+	_selection_scope_presets_popup = PopupMenu.new()
+	_selection_scope_presets_popup.name = "SelectionScopePresetsList"
+	_selection_scope_submenu_popup.add_child(_selection_scope_presets_popup)
+	_explain_signal_scope.connect_bound(_selection_scope_presets_popup.id_pressed, _on_scope_presets_list_id)
+	_explain_signal_scope.connect_bound(_selection_scope_submenu_popup.id_pressed, _on_scope_actions_submenu_id)
+
+
+func _set_hint_visible(on: bool) -> void:
+	if _hint:
+		_hint.visible = on
+		var h := 36 if on else 0
+		_hint.custom_minimum_size = Vector2(0, h)
+
+
+## While **Play scene** is running, transient **Scene dock** selection loss would clear the graph and break **CB-018** live pulses; keep the last successful layout for the same edited [code]scene_file_path[/code] instead.
+func _retain_last_graph_if_playing_scene(root: Node) -> bool:
+	if root == null or _plugin == null or _graph_view == null:
+		return false
+	if _session_scene_path.is_empty() or _last_layout.is_empty():
+		return false
+	if String(root.scene_file_path) != _session_scene_path:
+		return false
+	var ei := _plugin.get_editor_interface()
+	if not ei.is_playing_scene():
+		return false
+	return true
+
+
+func _clear_stale_snapshot() -> void:
+	_last_snap = null
+	_last_layout.clear()
+	_last_focus_id = ""
+	_session_scene_path = ""
+	_session_scope_node_path = ""
+	_narrative_cache.clear()
+	_graph_selected_node_id = ""
+	_graph_selected_edge_index = -1
+	_last_edge_from_id = ""
+	_last_edge_to_id = ""
+	_last_edge_kind = -1
+	_last_edge_label = ""
+	_last_focus_host_path = ""
+	_selection_kind = UiReactDockExplainMenuIds._SEL_NONE
+	_sync_wire_rules_section()
+	if _graph_view:
+		_graph_view.clear_graph()
+	_set_legend_scope_from_layout({})
+	_set_details_placeholder()
+
+
+func _set_hint(t: String) -> void:
+	if _hint:
+		_hint.text = t

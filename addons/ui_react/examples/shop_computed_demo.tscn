@@ -1,0 +1,326 @@
+[gd_scene load_steps=27 format=3 uid="uid://bhrsm6wi0v4s"]
+
+[ext_resource type="Script" uid="uid://cy1vsor6ek3xr" path="res://addons/ui_react/scripts/api/models/ui_float_state.gd" id="1_fl"]
+[ext_resource type="Script" uid="uid://st55qiias3cb" path="res://addons/ui_react/scripts/api/models/ui_state.gd" id="2_st"]
+[ext_resource type="Script" uid="uid://toxmw3una1r3" path="res://addons/ui_react/scripts/controls/ui_react_slider.gd" id="3_sl"]
+[ext_resource type="Script" uid="uid://dhntoxb5f7chr" path="res://addons/ui_react/scripts/controls/ui_react_rich_text_label.gd" id="4_rich"]
+[ext_resource type="Script" uid="uid://lv5ixpw5hlvp" path="res://addons/ui_react/scripts/controls/ui_react_button.gd" id="5_btn"]
+[ext_resource type="Script" uid="uid://xy66txjr2ogp" path="res://addons/ui_react/scripts/api/models/ui_computed_float_ge_product_bool.gd" id="7_aff"]
+[ext_resource type="Script" uid="uid://cb1qbwsvekjvx" path="res://addons/ui_react/scripts/api/models/ui_computed_bool_invert.gd" id="8_dis"]
+[ext_resource type="Script" uid="uid://dah4tjrxpddrd" path="res://addons/ui_react/scripts/api/models/ui_computed_order_summary_three_float_string.gd" id="9_stat"]
+[ext_resource type="Script" uid="uid://diigywt0dm170" path="res://addons/ui_react/scripts/api/models/ui_anim_target.gd" id="10_anim"]
+[ext_resource type="Script" uid="uid://s6xiov8r6bil" path="res://addons/ui_react/scripts/controls/ui_react_progress_bar.gd" id="11_pb"]
+[ext_resource type="Script" uid="uid://diihw85b5p4bd" path="res://addons/ui_react/scripts/controls/ui_react_spin_box.gd" id="12_sp"]
+[ext_resource type="Script" uid="uid://dqbg42kucypqk" path="res://addons/ui_react/scripts/api/models/ui_react_action_target.gd" id="13_at"]
+[ext_resource type="Script" uid="uid://dxvrutpo1gjxg" path="res://addons/ui_react/scripts/api/models/ui_int_state.gd" id="14_int"]
+[ext_resource type="Script" uid="uid://df8pyy2f07y1r" path="res://addons/ui_react/scripts/api/models/ui_react_audio_feedback_target.gd" id="15_aud"]
+[ext_resource type="Script" uid="uid://c81pboejnn7lj" path="res://addons/ui_react/scripts/api/models/ui_react_haptic_feedback_target.gd" id="16_hap"]
+[ext_resource type="AudioStream" uid="uid://bg1y8ag806hy2" path="res://addons/ui_react/example_audio.wav" id="17_sfx"]
+
+[sub_resource type="Resource" id="gold"]
+script = ExtResource("1_fl")
+value = 100.0
+
+[sub_resource type="Resource" id="price"]
+script = ExtResource("1_fl")
+value = 25.0
+
+[sub_resource type="Resource" id="qty"]
+script = ExtResource("1_fl")
+value = 1.0
+
+[sub_resource type="Resource" id="afford"]
+script = ExtResource("7_aff")
+sources = Array[ExtResource("2_st")]([SubResource("gold"), SubResource("price"), SubResource("qty")])
+value = true
+
+[sub_resource type="Resource" id="buy_dis"]
+script = ExtResource("8_dis")
+sources = Array[ExtResource("2_st")]([SubResource("afford")])
+
+[sub_resource type="Resource" id="status"]
+script = ExtResource("9_stat")
+sources = Array[ExtResource("2_st")]([SubResource("gold"), SubResource("price"), SubResource("qty")])
+value = "[font_size=18][b]Order summary[/b][/font_size]
+[i]Live totals[/i] — Total: [code]25.00[/code]  ·  Gold: [code]100.00[/code]
+[color=green][b]Can afford[/b][/color]"
+
+[sub_resource type="Resource" id="status_pulse"]
+script = ExtResource("10_anim")
+target = NodePath(".")
+trigger = 5
+animation = 17
+duration = 0.22
+pulse_amount = 1.06
+pulse_count = 1
+
+[sub_resource type="Resource" id="buy_action"]
+script = ExtResource("13_at")
+rule_id = "buy_subtract_gold"
+action = 4
+trigger = 0
+float_accumulator = SubResource("gold")
+float_factor_a = SubResource("price")
+float_factor_b = SubResource("qty")
+
+[sub_resource type="Resource" id="bank"]
+script = ExtResource("1_fl")
+value = 0.0
+
+[sub_resource type="Resource" id="tickets"]
+script = ExtResource("14_int")
+value = 10
+
+[sub_resource type="Resource" id="gift"]
+script = ExtResource("14_int")
+value = 0
+
+[sub_resource type="Resource" id="int_fa"]
+script = ExtResource("14_int")
+value = 2
+
+[sub_resource type="Resource" id="int_fb"]
+script = ExtResource("14_int")
+value = 3
+
+[sub_resource type="Resource" id="sell_action"]
+script = ExtResource("13_at")
+rule_id = "sell_add_gold"
+action = 5
+trigger = 0
+float_accumulator = SubResource("gold")
+float_factor_a = SubResource("price")
+float_factor_b = SubResource("qty")
+
+[sub_resource type="Resource" id="deposit_action"]
+script = ExtResource("13_at")
+rule_id = "deposit_bank"
+action = 6
+trigger = 0
+float_from = SubResource("gold")
+float_to = SubResource("bank")
+float_factor_a = SubResource("price")
+float_factor_b = SubResource("qty")
+
+[sub_resource type="Resource" id="add_tickets_action"]
+script = ExtResource("13_at")
+rule_id = "add_tickets"
+action = 7
+trigger = 0
+int_accumulator = SubResource("tickets")
+int_factor_a = SubResource("int_fa")
+int_factor_b = SubResource("int_fb")
+
+[sub_resource type="Resource" id="tip_action"]
+script = ExtResource("13_at")
+rule_id = "tip_gift"
+action = 8
+trigger = 0
+int_from = SubResource("tickets")
+int_to = SubResource("gift")
+int_factor_a = SubResource("int_fa")
+int_factor_b = SubResource("int_fb")
+
+[sub_resource type="Resource" id="buy_fb_audio"]
+script = ExtResource("15_aud")
+player = NodePath("UISfxBuy")
+
+[sub_resource type="Resource" id="buy_fb_hap"]
+script = ExtResource("16_hap")
+
+[node name="ShopComputedDemo" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = 24.0
+offset_right = -24.0
+offset_bottom = -24.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="VBox"]
+layout_mode = 2
+text = "Shop (computed state demo)"
+
+[node name="Help" type="Label" parent="VBox"]
+custom_minimum_size = Vector2(1, 1)
+layout_mode = 2
+text = "Adjust gold, price, and quantity. Gold meter + quantity spin box are showcase bindings (shared gold/qty state). Status line is UiReactRichTextLabel + BBCode from UiComputedOrderSummaryThreeFloatString; afford/disabled use UiComputedFloatGeProductBool + UiComputedBoolInvert. Action layer (UiReactStateOpService): Buy = SUBTRACT_PRODUCT_FROM_FLOAT; Sell = ADD_PRODUCT_TO_FLOAT (refund price×qty); Deposit = TRANSFER_FLOAT_PRODUCT_CLAMPED (gold→bank, clamped by price×qty); Add tickets = ADD_PRODUCT_TO_INT (tickets += 2×3); Tip = TRANSFER_INT_PRODUCT_CLAMPED (tickets→gift, clamped by 2×3). Buy: audio + haptic on press (CB-061)."
+autowrap_mode = 3
+
+[node name="ScrollShop" type="ScrollContainer" parent="VBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="ShopInner" type="VBoxContainer" parent="VBox/ScrollShop"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
+
+[node name="GoldLabel" type="Label" parent="VBox/ScrollShop/ShopInner"]
+layout_mode = 2
+text = "Player gold"
+
+[node name="GoldSlider" type="HSlider" parent="VBox/ScrollShop/ShopInner"]
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 200.0
+value = 100.0
+script = ExtResource("3_sl")
+value_state = SubResource("gold")
+
+[node name="GoldMeterLabel" type="Label" parent="VBox/ScrollShop/ShopInner"]
+layout_mode = 2
+text = "Gold meter (UiReactProgressBar — same UiFloatState as slider)"
+
+[node name="GoldMeter" type="ProgressBar" parent="VBox/ScrollShop/ShopInner"]
+layout_mode = 2
+max_value = 200.0
+value = 100.0
+show_percentage = false
+script = ExtResource("11_pb")
+value_state = SubResource("gold")
+
+[node name="BankLabel" type="Label" parent="VBox/ScrollShop/ShopInner"]
+layout_mode = 2
+text = "Bank pool (UiFloatState — TRANSFER_FLOAT_PRODUCT_CLAMPED destination)"
+
+[node name="BankMeter" type="ProgressBar" parent="VBox/ScrollShop/ShopInner"]
+layout_mode = 2
+max_value = 200.0
+value = 0.0
+show_percentage = false
+script = ExtResource("11_pb")
+value_state = SubResource("bank")
+
+[node name="TicketsLabel" type="Label" parent="VBox/ScrollShop/ShopInner"]
+layout_mode = 2
+text = "Tickets (UiIntState — ADD_PRODUCT_TO_INT / TRANSFER_INT_PRODUCT_CLAMPED)"
+
+[node name="TicketsMeter" type="ProgressBar" parent="VBox/ScrollShop/ShopInner"]
+layout_mode = 2
+max_value = 100.0
+value = 10.0
+show_percentage = false
+script = ExtResource("11_pb")
+value_state = SubResource("tickets")
+
+[node name="GiftLabel" type="Label" parent="VBox/ScrollShop/ShopInner"]
+layout_mode = 2
+text = "Gift jar (UiIntState — tip destination)"
+
+[node name="GiftMeter" type="ProgressBar" parent="VBox/ScrollShop/ShopInner"]
+layout_mode = 2
+max_value = 100.0
+value = 0.0
+show_percentage = false
+script = ExtResource("11_pb")
+value_state = SubResource("gift")
+
+[node name="PriceLabel" type="Label" parent="VBox/ScrollShop/ShopInner"]
+layout_mode = 2
+text = "Item price (each)"
+
+[node name="PriceSlider" type="HSlider" parent="VBox/ScrollShop/ShopInner"]
+layout_mode = 2
+size_flags_horizontal = 3
+step = 0.5
+value = 25.0
+script = ExtResource("3_sl")
+value_state = SubResource("price")
+
+[node name="QtyLabel" type="Label" parent="VBox/ScrollShop/ShopInner"]
+layout_mode = 2
+text = "Quantity"
+
+[node name="QtySlider" type="HSlider" parent="VBox/ScrollShop/ShopInner"]
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 10.0
+value = 1.0
+script = ExtResource("3_sl")
+value_state = SubResource("qty")
+
+[node name="QtySpinLabel" type="Label" parent="VBox/ScrollShop/ShopInner"]
+layout_mode = 2
+text = "Quantity (UiReactSpinBox — same state as slider; disabled when Buy disabled)"
+
+[node name="QtySpin" type="SpinBox" parent="VBox/ScrollShop/ShopInner"]
+layout_mode = 2
+min_value = 0.0
+max_value = 10.0
+step = 1.0
+value = 1.0
+script = ExtResource("12_sp")
+value_state = SubResource("qty")
+disabled_state = SubResource("buy_dis")
+
+[node name="StatusLine" type="RichTextLabel" parent="VBox/ScrollShop/ShopInner"]
+custom_minimum_size = Vector2(1, 1)
+layout_mode = 2
+bbcode_enabled = true
+text = "[font_size=18][b]Order summary[/b][/font_size]
+[i]Live totals[/i] — Total: [code]25.00[/code]  ·  Gold: [code]100.00[/code]
+[color=green][b]Can afford[/b][/color]"
+fit_content = true
+scroll_active = false
+autowrap_mode = 2
+script = ExtResource("4_rich")
+text_state = SubResource("status")
+animation_targets = Array[ExtResource("10_anim")]([SubResource("status_pulse")])
+
+[node name="BuyButton" type="Button" parent="VBox"]
+layout_mode = 2
+text = "Buy"
+script = ExtResource("5_btn")
+disabled_state = SubResource("buy_dis")
+action_targets = [SubResource("buy_action")]
+audio_targets = Array[ExtResource("15_aud")]([SubResource("buy_fb_audio")])
+haptic_targets = Array[ExtResource("16_hap")]([SubResource("buy_fb_hap")])
+
+[node name="UISfxBuy" type="AudioStreamPlayer" parent="VBox/BuyButton"]
+stream = ExtResource("17_sfx")
+
+[node name="ShopMathRow" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SellButton" type="Button" parent="VBox/ShopMathRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Sell (ADD_PRODUCT_TO_FLOAT)"
+script = ExtResource("5_btn")
+action_targets = [SubResource("sell_action")]
+
+[node name="DepositButton" type="Button" parent="VBox/ShopMathRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Deposit (TRANSFER_FLOAT)"
+script = ExtResource("5_btn")
+action_targets = [SubResource("deposit_action")]
+
+[node name="AddTicketsButton" type="Button" parent="VBox/ShopMathRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Add tickets (ADD_INT)"
+script = ExtResource("5_btn")
+action_targets = [SubResource("add_tickets_action")]
+
+[node name="TipButton" type="Button" parent="VBox/ShopMathRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Tip (TRANSFER_INT)"
+script = ExtResource("5_btn")
+action_targets = [SubResource("tip_action")]

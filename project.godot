@@ -1,0 +1,37 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="Ui React"
+run/main_scene="res://addons/ui_react/examples/inventory_screen_demo.tscn"
+config/features=PackedStringArray("4.5", "Forward Plus")
+config/icon="res://icon.svg"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/ui_react/editor_plugin/plugin.cfg")
+
+[ui_react]
+
+settings/diagnostics/show_errors=true
+settings/diagnostics/show_warnings=true
+settings/diagnostics/show_info=true
+settings/diagnostics/group_mode=1
+settings/diagnostics/ignored_unused_state_paths=PackedStringArray()
+settings/graph/legend_visible=true
+settings/schema_version=4
+settings/runtime/console_debug_enabled=true
+settings/resources/output_path="res://addons/ui_react/ui_resources/plugin_generated/"
+settings/diagnostics/scan_mode=1
+settings/shortcuts/open_diagnostics_json="{\"alt\":true,\"ctrl\":false,\"enabled\":true,\"keycode\":49,\"meta\":false,\"shift\":false,\"v\":1}"
+settings/shortcuts/open_wiring_json="{\"alt\":true,\"ctrl\":false,\"enabled\":true,\"keycode\":50,\"meta\":false,\"shift\":false,\"v\":1}"
+settings/runtime/graph_live_pulses_enabled=true
+settings/runtime/editor_play_mode=5
