@@ -1,4 +1,4 @@
-[gd_scene load_steps=27 format=3 uid="uid://bhrsm6wi0v4s"]
+[gd_scene format=3 uid="uid://bhrsm6wi0v4s"]
 
 [ext_resource type="Script" uid="uid://cy1vsor6ek3xr" path="res://addons/ui_react/scripts/api/models/ui_float_state.gd" id="1_fl"]
 [ext_resource type="Script" uid="uid://st55qiias3cb" path="res://addons/ui_react/scripts/api/models/ui_state.gd" id="2_st"]
@@ -15,7 +15,7 @@
 [ext_resource type="Script" uid="uid://dxvrutpo1gjxg" path="res://addons/ui_react/scripts/api/models/ui_int_state.gd" id="14_int"]
 [ext_resource type="Script" uid="uid://df8pyy2f07y1r" path="res://addons/ui_react/scripts/api/models/ui_react_audio_feedback_target.gd" id="15_aud"]
 [ext_resource type="Script" uid="uid://c81pboejnn7lj" path="res://addons/ui_react/scripts/api/models/ui_react_haptic_feedback_target.gd" id="16_hap"]
-[ext_resource type="AudioStream" uid="uid://bg1y8ag806hy2" path="res://addons/ui_react/example_audio.wav" id="17_sfx"]
+[ext_resource type="AudioStream" uid="uid://bg1y8ag806hy2" path="res://addons/ui_react/examples/example_audio.wav" id="17_sfx"]
 
 [sub_resource type="Resource" id="gold"]
 script = ExtResource("1_fl")

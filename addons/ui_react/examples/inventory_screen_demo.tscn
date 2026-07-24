@@ -1,4 +1,4 @@
-[gd_scene load_steps=66 format=3 uid="uid://ca8gfny15h7yc"]
+[gd_scene format=3 uid="uid://ca8gfny15h7yc"]
 
 [ext_resource type="Script" uid="uid://dd4kr4kdd6cnc" path="res://addons/ui_react/scripts/controls/ui_react_tree.gd" id="2_tree"]
 [ext_resource type="Script" uid="uid://cgoqls6mehlqv" path="res://addons/ui_react/scripts/controls/ui_react_line_edit.gd" id="3_le"]
@@ -11,7 +11,7 @@
 [ext_resource type="Script" uid="uid://dxvrutpo1gjxg" path="res://addons/ui_react/scripts/api/models/ui_int_state.gd" id="9_int"]
 [ext_resource type="Script" uid="uid://cxg5hj6ihqtue" path="res://addons/ui_react/scripts/api/models/ui_bool_state.gd" id="10_bool"]
 [ext_resource type="Script" uid="uid://b21fgnaf6xp7" path="res://addons/ui_react/scripts/controls/ui_react_texture_button.gd" id="11_tex"]
-[ext_resource type="Texture2D" uid="uid://dqdnr3bne60mc" path="res://icon.svg" id="12_icon"]
+[ext_resource type="Texture2D" uid="uid://djbuxse2lylj8" path="res://icon.svg" id="12_icon"]
 [ext_resource type="Script" uid="uid://diigywt0dm170" path="res://addons/ui_react/scripts/api/models/ui_anim_target.gd" id="13_anim"]
 [ext_resource type="Script" uid="uid://dqbg42kucypqk" path="res://addons/ui_react/scripts/api/models/ui_react_action_target.gd" id="14_action"]
 [ext_resource type="Script" uid="uid://b75p2so2hr0wd" path="res://addons/ui_react/scripts/controls/ui_react_option_button.gd" id="15_opt"]
@@ -25,14 +25,7 @@
 [ext_resource type="Script" uid="uid://6d4hb1i0lprx" path="res://addons/ui_react/scripts/api/models/ui_react_wire_sort_array_by_key.gd" id="24_wsort"]
 [ext_resource type="Script" uid="uid://df8pyy2f07y1r" path="res://addons/ui_react/scripts/api/models/ui_react_audio_feedback_target.gd" id="25_aud"]
 [ext_resource type="Script" uid="uid://c81pboejnn7lj" path="res://addons/ui_react/scripts/api/models/ui_react_haptic_feedback_target.gd" id="26_hap"]
-[ext_resource type="AudioStream" uid="uid://bg1y8ag806hy2" path="res://addons/ui_react/example_audio.wav" id="27_sfx"]
-
-[sub_resource type="Resource" id="use_fb_audio"]
-script = ExtResource("25_aud")
-player = NodePath("UISfxUse")
-
-[sub_resource type="Resource" id="use_fb_hap"]
-script = ExtResource("26_hap")
+[ext_resource type="AudioStream" uid="uid://bg1y8ag806hy2" path="res://addons/ui_react/examples/example_audio.wav" id="27_sfx"]
 
 [sub_resource type="Resource" id="tn_all"]
 script = ExtResource("21_tnode")
@@ -169,6 +162,16 @@ state_watch = SubResource("locked_bool")
 action = 3
 target = NodePath("../InputBlocker")
 
+[sub_resource type="Resource" id="sort_preset_str"]
+script = ExtResource("7_str")
+value = "name"
+
+[sub_resource type="Resource" id="wire_sort_items"]
+script = ExtResource("24_wsort")
+items_state = SubResource("items_arr")
+sort_key_state = SubResource("sort_preset_str")
+rule_id = "sort_items_by_key"
+
 [sub_resource type="Resource" id="detail_str"]
 script = ExtResource("7_str")
 value = "No selection."
@@ -243,20 +246,17 @@ target_string_state = SubResource("dbg_dis_str")
 line_prefix = "actions disabled_state: "
 rule_id = "debug_actions_disabled"
 
-[sub_resource type="Resource" id="sort_preset_str"]
-script = ExtResource("7_str")
-value = "name"
-
-[sub_resource type="Resource" id="wire_sort_items"]
-script = ExtResource("24_wsort")
-items_state = SubResource("items_arr")
-sort_key_state = SubResource("sort_preset_str")
-rule_id = "sort_items_by_key"
-
 [sub_resource type="Resource" id="anim_pop_use"]
 script = ExtResource("13_anim")
 target = NodePath(".")
 animation = 17
+
+[sub_resource type="Resource" id="use_fb_audio"]
+script = ExtResource("25_aud")
+player = NodePath("UISfxUse")
+
+[sub_resource type="Resource" id="use_fb_hap"]
+script = ExtResource("26_hap")
 
 [sub_resource type="Resource" id="anim_pop_sort"]
 script = ExtResource("13_anim")
@@ -264,7 +264,7 @@ target = NodePath(".")
 animation = 17
 duration = 0.16
 
-[node name="InventoryScreenDemo" type="Control"]
+[node name="InventoryScreenDemo" type="Control" unique_id=1695184210]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -272,7 +272,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="MainHBox" type="HBoxContainer" parent="."]
+[node name="MainHBox" type="HBoxContainer" parent="." unique_id=1632289738]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -285,22 +285,22 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 16
 
-[node name="LeftColumn" type="VBoxContainer" parent="MainHBox"]
+[node name="LeftColumn" type="VBoxContainer" parent="MainHBox" unique_id=1992993027]
 custom_minimum_size = Vector2(240, 0)
 layout_mode = 2
 size_flags_horizontal = 0
 theme_override_constants/separation = 8
 
-[node name="Title" type="Label" parent="MainHBox/LeftColumn"]
+[node name="Title" type="Label" parent="MainHBox/LeftColumn" unique_id=399962175]
 layout_mode = 2
 text = "Categories"
 
-[node name="Help" type="Label" parent="MainHBox/LeftColumn"]
+[node name="Help" type="Label" parent="MainHBox/LeftColumn" unique_id=824314033]
 layout_mode = 2
 text = "UiReactTree + P5 wire_rules (map + refresh). Hint is UiReactLabel + state. Category FADE_IN (UiAnimTarget)."
 autowrap_mode = 3
 
-[node name="CategoryTree" type="Tree" parent="MainHBox/LeftColumn"]
+[node name="CategoryTree" type="Tree" parent="MainHBox/LeftColumn" unique_id=271288972]
 custom_minimum_size = Vector2(0, 200)
 layout_mode = 2
 size_flags_vertical = 3
@@ -311,57 +311,57 @@ selected_state = SubResource("tree_sel")
 animation_targets = Array[ExtResource("13_anim")]([SubResource("anim_tree_hint_fade")])
 wire_rules = Array[ExtResource("8_xha3j")]([SubResource("wire_map_cat"), SubResource("wire_refresh_tree")])
 
-[node name="CategoryHint" type="Label" parent="MainHBox/LeftColumn"]
+[node name="CategoryHint" type="Label" parent="MainHBox/LeftColumn" unique_id=1503600647]
 layout_mode = 2
 autowrap_mode = 3
 script = ExtResource("5_lbl")
 text_state = SubResource("category_hint_str")
 
-[node name="CenterColumn" type="VBoxContainer" parent="MainHBox"]
+[node name="CenterColumn" type="VBoxContainer" parent="MainHBox" unique_id=665025506]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 10
 
-[node name="Title" type="Label" parent="MainHBox/CenterColumn"]
+[node name="Title" type="Label" parent="MainHBox/CenterColumn" unique_id=535391067]
 layout_mode = 2
 text = "Items"
 
-[node name="Help" type="Label" parent="MainHBox/CenterColumn"]
+[node name="Help" type="Label" parent="MainHBox/CenterColumn" unique_id=1896594613]
 layout_mode = 2
 text = "wire_rules (refresh, sort by dict key, copy detail, …). Lock: action_targets SET_MOUSE_FILTER (P6.1). Uncheck Lock → GRAB_FOCUS on filter."
 autowrap_mode = 3
 
-[node name="FilterLabel" type="Label" parent="MainHBox/CenterColumn"]
+[node name="FilterLabel" type="Label" parent="MainHBox/CenterColumn" unique_id=719332957]
 layout_mode = 2
 text = "Filter"
 
-[node name="FilterEdit" type="LineEdit" parent="MainHBox/CenterColumn"]
+[node name="FilterEdit" type="LineEdit" parent="MainHBox/CenterColumn" unique_id=365390283]
 layout_mode = 2
 placeholder_text = "e.g. wood, potion…"
 script = ExtResource("3_le")
 text_state = SubResource("filter_str")
 wire_rules = Array[ExtResource("8_xha3j")]([SubResource("wire_refresh_filter")])
 
-[node name="LockRow" type="HBoxContainer" parent="MainHBox/CenterColumn"]
+[node name="LockRow" type="HBoxContainer" parent="MainHBox/CenterColumn" unique_id=369955206]
 layout_mode = 2
 
-[node name="LockList" type="CheckBox" parent="MainHBox/CenterColumn/LockRow"]
+[node name="LockList" type="CheckBox" parent="MainHBox/CenterColumn/LockRow" unique_id=1285395769]
 layout_mode = 2
 text = "Lock list"
 script = ExtResource("6_cb")
 checked_state = SubResource("locked_bool")
 action_targets = Array[ExtResource("14_action")]([SubResource("action_grab_filter")])
 
-[node name="ListLabel" type="Label" parent="MainHBox/CenterColumn"]
+[node name="ListLabel" type="Label" parent="MainHBox/CenterColumn" unique_id=162124483]
 layout_mode = 2
 text = "Item list"
 
-[node name="ListSlot" type="Control" parent="MainHBox/CenterColumn"]
+[node name="ListSlot" type="Control" parent="MainHBox/CenterColumn" unique_id=2091098547]
 custom_minimum_size = Vector2(0, 200)
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="ItemList" type="ItemList" parent="MainHBox/CenterColumn/ListSlot"]
+[node name="ItemList" type="ItemList" parent="MainHBox/CenterColumn/ListSlot" unique_id=1606815832]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -369,13 +369,13 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("4_il")
-selected_state = SubResource("sel_int")
 items_state = SubResource("items_arr")
+selected_state = SubResource("sel_int")
 animation_targets = Array[ExtResource("13_anim")]([SubResource("anim_list_detail_fade")])
 action_targets = Array[ExtResource("14_action")]([SubResource("action_lock_mousefilter")])
 wire_rules = Array[ExtResource("8_xha3j")]([SubResource("wire_sort_items"), SubResource("wire_copy"), SubResource("wire_use_suffix"), SubResource("wire_sort_suffix"), SubResource("wire_dbg_use"), SubResource("wire_dbg_sort"), SubResource("wire_dbg_dis")])
 
-[node name="InputBlocker" type="Control" parent="MainHBox/CenterColumn/ListSlot"]
+[node name="InputBlocker" type="Control" parent="MainHBox/CenterColumn/ListSlot" unique_id=1545541421]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -384,37 +384,37 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="DetailLabel" type="Label" parent="MainHBox/CenterColumn"]
+[node name="DetailLabel" type="Label" parent="MainHBox/CenterColumn" unique_id=1458898513]
 layout_mode = 2
 text = "Detail"
 
-[node name="Detail" type="Label" parent="MainHBox/CenterColumn"]
+[node name="Detail" type="Label" parent="MainHBox/CenterColumn" unique_id=1492923562]
 custom_minimum_size = Vector2(1, 1)
 layout_mode = 2
 autowrap_mode = 2
 script = ExtResource("5_lbl")
 text_state = SubResource("detail_str")
 
-[node name="RightColumn" type="VBoxContainer" parent="MainHBox"]
+[node name="RightColumn" type="VBoxContainer" parent="MainHBox" unique_id=1161669526]
 custom_minimum_size = Vector2(220, 0)
 layout_mode = 2
 size_flags_horizontal = 0
 theme_override_constants/separation = 8
 
-[node name="Title" type="Label" parent="MainHBox/RightColumn"]
+[node name="Title" type="Label" parent="MainHBox/RightColumn" unique_id=207923425]
 layout_mode = 2
 text = "Actions"
 
-[node name="Help" type="Label" parent="MainHBox/RightColumn"]
+[node name="Help" type="Label" parent="MainHBox/RightColumn" unique_id=1196648170]
 layout_mode = 2
 text = "Sort preset: option text matches row dict keys (name/kind/qty). Map friendly labels in game data if needed. Use/Sort texture buttons: POP on press. Use: audio + haptic on press (CB-061 — see FEEDBACK_LAYER.md)."
 autowrap_mode = 3
 
-[node name="SortPresetLabel" type="Label" parent="MainHBox/RightColumn"]
+[node name="SortPresetLabel" type="Label" parent="MainHBox/RightColumn" unique_id=1389448114]
 layout_mode = 2
 text = "Sort by key (dict field)"
 
-[node name="SortPreset" type="OptionButton" parent="MainHBox/RightColumn"]
+[node name="SortPreset" type="OptionButton" parent="MainHBox/RightColumn" unique_id=991597138]
 layout_mode = 2
 item_count = 3
 popup/item_0/text = "name"
@@ -427,11 +427,11 @@ script = ExtResource("15_opt")
 selected_state = SubResource("sort_preset_str")
 disabled_state = SubResource("actions_disabled")
 
-[node name="ActionButtons" type="HBoxContainer" parent="MainHBox/RightColumn"]
+[node name="ActionButtons" type="HBoxContainer" parent="MainHBox/RightColumn" unique_id=466673139]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="UseButton" type="TextureButton" parent="MainHBox/RightColumn/ActionButtons"]
+[node name="UseButton" type="TextureButton" parent="MainHBox/RightColumn/ActionButtons" unique_id=1653538402]
 custom_minimum_size = Vector2(64, 64)
 layout_mode = 2
 texture_normal = ExtResource("12_icon")
@@ -442,10 +442,10 @@ animation_targets = Array[ExtResource("13_anim")]([SubResource("anim_pop_use")])
 audio_targets = Array[ExtResource("25_aud")]([SubResource("use_fb_audio")])
 haptic_targets = Array[ExtResource("26_hap")]([SubResource("use_fb_hap")])
 
-[node name="UISfxUse" type="AudioStreamPlayer" parent="MainHBox/RightColumn/ActionButtons/UseButton"]
+[node name="UISfxUse" type="AudioStreamPlayer" parent="MainHBox/RightColumn/ActionButtons/UseButton" unique_id=1487848023]
 stream = ExtResource("27_sfx")
 
-[node name="SortButton" type="TextureButton" parent="MainHBox/RightColumn/ActionButtons"]
+[node name="SortButton" type="TextureButton" parent="MainHBox/RightColumn/ActionButtons" unique_id=739777914]
 custom_minimum_size = Vector2(64, 64)
 layout_mode = 2
 texture_normal = ExtResource("12_icon")
@@ -454,23 +454,23 @@ pressed_state = SubResource("sort_pressed")
 disabled_state = SubResource("actions_disabled")
 animation_targets = Array[ExtResource("13_anim")]([SubResource("anim_pop_sort")])
 
-[node name="DisableActions" type="CheckBox" parent="MainHBox/RightColumn"]
+[node name="DisableActions" type="CheckBox" parent="MainHBox/RightColumn" unique_id=405292911]
 layout_mode = 2
 text = "Disable actions"
 script = ExtResource("6_cb")
 checked_state = SubResource("actions_disabled")
 
-[node name="PressedUseLabel" type="Label" parent="MainHBox/RightColumn"]
+[node name="PressedUseLabel" type="Label" parent="MainHBox/RightColumn" unique_id=1966074503]
 layout_mode = 2
 script = ExtResource("5_lbl")
 text_state = SubResource("dbg_use_str")
 
-[node name="PressedSortLabel" type="Label" parent="MainHBox/RightColumn"]
+[node name="PressedSortLabel" type="Label" parent="MainHBox/RightColumn" unique_id=1393989699]
 layout_mode = 2
 script = ExtResource("5_lbl")
 text_state = SubResource("dbg_sort_str")
 
-[node name="DisabledActionsLabel" type="Label" parent="MainHBox/RightColumn"]
+[node name="DisabledActionsLabel" type="Label" parent="MainHBox/RightColumn" unique_id=1958661840]
 layout_mode = 2
 script = ExtResource("5_lbl")
 text_state = SubResource("dbg_dis_str")
