@@ -107,6 +107,7 @@ func _validate_animation_targets() -> void:
 	if trigger_map.has(UiAnimTarget.Trigger.FOCUS_EXITED):
 		_local_signal_scope.connect_bound(focus_exited, _on_trigger_focus_exited)
 
+	UiReactActionTargetHelper.sync_initial_state(self, "UiReactLineEdit", action_targets)
 	UiReactFeedbackTargetHelper.sync_initial_state(self, "UiReactLineEdit", audio_targets, haptic_targets)
 
 

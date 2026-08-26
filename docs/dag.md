@@ -40,14 +40,14 @@ Source: confirmed findings only (BUG-/GDS-/ARCH-/PAT-/TEST-). Do not expand into
 
 | Node ID | Audit IDs | Status | Significance | Triviality | Bug class | Doc sync | Pipeline | Notes |
 |---------|-----------|--------|--------------|------------|-----------|----------|----------|-------|
-| **A-01** | BUG-005 | `TODO` | routine | **trivial** | Implementation | none | single IMPL (no PLAN) | Add `sync_initial_state` after action validate on LineEdit |
-| **A-02** | BUG-006 | `TODO` | routine | **trivial** | Implementation | none | single IMPL | `is_instance_valid` before `is_inside_tree` in wire callbacks |
-| **A-03** | BUG-007 | `TODO` | routine | **trivial** | Implementation | none | single IMPL | `set_silent` reject path match `set_value` |
-| **A-04** | BUG-001 | `TODO` | SIGNIFICANT | non-trivial | Design / Framework | ADR-0001 Accepted | PLAN complete → PREFLIGHT→IMPL | Pulse contract |
-| **A-05** | BUG-002, BUG-003, BUG-004 | `TODO` | SIGNIFICANT | non-trivial | Framework | ADR-0002 Accepted | PLAN complete → … | Stop export write-back |
-| **A-06** | BUG-008 | `TODO` | SIGNIFICANT | non-trivial | Framework | ADR-0003 | PLAN complete → … | Getter copy |
-| **A-07** | BUG-009 | `TODO` | SIGNIFICANT | non-trivial | Framework | ADR-0003 | PLAN complete → … | Deep clone |
-| **A-08** | BUG-010, ARCH-001, PAT-001 | `TODO` | SIGNIFICANT | non-trivial | Architecture | ADR-0004 | PLAN complete → … | Runtime cfg duplicate |
+| **A-01** | BUG-005 | `DONE` | routine | **trivial** | Implementation | none | single IMPL (no PLAN) | Add `sync_initial_state` after action validate on LineEdit |
+| **A-02** | BUG-006 | `DONE` | routine | **trivial** | Implementation | none | single IMPL | `is_instance_valid` before `is_inside_tree` in wire callbacks |
+| **A-03** | BUG-007 | `DONE` | routine | **trivial** | Implementation | none | single IMPL | `set_silent` reject path match `set_value` |
+| **A-04** | BUG-001 | `DONE` | SIGNIFICANT | non-trivial | Design / Framework | ADR-0001 Accepted | PLAN→PREFLIGHT→IMPL | Pulse contract |
+| **A-05** | BUG-002, BUG-003, BUG-004 | `DONE` | SIGNIFICANT | non-trivial | Framework | ADR-0002 Accepted | PLAN→PREFLIGHT→IMPL | Stop export write-back |
+| **A-06** | BUG-008 | `DONE` | SIGNIFICANT | non-trivial | Framework | ADR-0003 | PLAN→PREFLIGHT→IMPL | Getter copy |
+| **A-07** | BUG-009 | `DONE` | SIGNIFICANT | non-trivial | Framework | ADR-0003 | PLAN→PREFLIGHT→IMPL | Deep clone |
+| **A-08** | BUG-010, ARCH-001, PAT-001 | `DONE` | SIGNIFICANT | non-trivial | Architecture | ADR-0004 | PLAN→PREFLIGHT→IMPL | Runtime cfg duplicate |
 
 **Dependency note:** A-01…A-03 do not require DEC-*. Prefer dispatching them first. IMPL turns for bugs still open with `godot-bugs.mdc` Evidence Ledger. Non-trivial A-04…A-08 require PREFLIGHT at dispatch (not at plan time).
 
@@ -158,7 +158,7 @@ Source: confirmed findings only (BUG-/GDS-/ARCH-/PAT-/TEST-). Do not expand into
 
 | Node ID | Audit IDs | Status | Significance | Triviality | Doc sync | Pipeline |
 |---------|-----------|--------|--------------|------------|-----------|----------|
-| **B-00** | TEST foundation / DEC-005 | `TODO` | SIGNIFICANT | non-trivial | ADR-0005 + Dev Guide §5 | PLAN complete → PREFLIGHT→IMPL |
+| **B-00** | TEST foundation / DEC-005 | `DONE` | SIGNIFICANT | non-trivial | ADR-0005 + Dev Guide §5 | PLAN→PREFLIGHT→IMPL |
 | **B-01** | TEST-001…004 | `TODO` | SIGNIFICANT (with B-00) | non-trivial | none beyond B-00 | after B-00 DONE |
 | **B-02** | TEST-005…009 | `TODO` | — | non-trivial | — | UiState concrete family |
 | **B-03** | TEST-010…011 | `TODO` | — | non-trivial | — | Transactional |
@@ -269,9 +269,9 @@ Batch Continuous Improvement patterns. All **routine** for Significance unless a
 ## Recommended dispatch order
 
 1. ~~User confirms DEC-001…005~~ **DONE** (2026-08-25).
-2. IMPL **A-01 → A-02 → A-03** (trivial bugs; Evidence Ledger each turn).
-3. For each of **A-04…A-08**: PREFLIGHT (five checks at dispatch) → IMPL per PLAN; prefer GUT asserts after **B-00** where Acceptance names them.
-4. PREFLIGHT → IMPL **B-00**, then PLAN/IMPL **B-01…**.
+2. ~~IMPL **A-01 → A-02 → A-03**~~ **DONE**
+3. ~~For each of **A-04…A-08**: PREFLIGHT → IMPL~~ **DONE**
+4. ~~PREFLIGHT → IMPL **B-00**~~ **DONE**; then PLAN/IMPL **B-01…**.
 5. Wave C, then Wave D batches.
 
 ## Continuous Improvement (proposals only — not applied)

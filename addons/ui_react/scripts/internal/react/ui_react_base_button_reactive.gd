@@ -75,43 +75,20 @@ func on_ready() -> void:
 	UiReactStateBindingHelper.deferred_finish_initialization(_host)
 
 
-func _matching_export_rows(raw: Variant, item_predicate: Callable) -> Array:
-	var out: Array = []
-	if raw is Array:
-		for it in raw as Array:
-			if item_predicate.call(it):
-				out.append(it)
-	return out
+func _animation_targets_from_host() -> Array[UiAnimTarget]:
+	return UiReactAnimTargetHelper.get_runtime_animation_targets(_host, &"animation_targets")
 
 
 func _action_targets_from_host() -> Array[UiReactActionTarget]:
-	var raw: Variant = _host.get(&"action_targets")
-	if raw is Array[UiReactActionTarget]:
-		return raw as Array[UiReactActionTarget]
-	var out: Array[UiReactActionTarget] = []
-	for it in _matching_export_rows(raw, func(elem: Variant) -> bool: return elem is UiReactActionTarget):
-		out.append(it as UiReactActionTarget)
-	return out
+	return UiReactActionTargetHelper._runtime_action_targets(_host)
 
 
 func _audio_targets_from_host() -> Array[UiReactAudioFeedbackTarget]:
-	var raw: Variant = _host.get(&"audio_targets")
-	if raw is Array[UiReactAudioFeedbackTarget]:
-		return raw as Array[UiReactAudioFeedbackTarget]
-	var out_a: Array[UiReactAudioFeedbackTarget] = []
-	for it in _matching_export_rows(raw, func(elem: Variant) -> bool: return elem is UiReactAudioFeedbackTarget):
-		out_a.append(it as UiReactAudioFeedbackTarget)
-	return out_a
+	return UiReactFeedbackTargetHelper._runtime_audio_targets(_host)
 
 
 func _haptic_targets_from_host() -> Array[UiReactHapticFeedbackTarget]:
-	var raw_h: Variant = _host.get(&"haptic_targets")
-	if raw_h is Array[UiReactHapticFeedbackTarget]:
-		return raw_h as Array[UiReactHapticFeedbackTarget]
-	var out_h: Array[UiReactHapticFeedbackTarget] = []
-	for it_h in _matching_export_rows(raw_h, func(elem: Variant) -> bool: return elem is UiReactHapticFeedbackTarget):
-		out_h.append(it_h as UiReactHapticFeedbackTarget)
-	return out_h
+	return UiReactFeedbackTargetHelper._runtime_haptic_targets(_host)
 
 
 func _validate_animation_targets() -> void:
@@ -170,16 +147,6 @@ func _on_trigger_toggled(active: bool) -> void:
 		_trigger_animations(UiAnimTarget.Trigger.TOGGLED_OFF)
 
 
-func _animation_targets_from_host() -> Array[UiAnimTarget]:
-	var raw: Variant = _host.get(&"animation_targets")
-	if raw is Array[UiAnimTarget]:
-		return raw as Array[UiAnimTarget]
-	var out: Array[UiAnimTarget] = []
-	for it in _matching_export_rows(raw, func(elem: Variant) -> bool: return elem is UiAnimTarget):
-		out.append(it as UiAnimTarget)
-	return out
-
-
 func _trigger_animations(trigger_type: UiAnimTarget.Trigger) -> void:
 	var anim: Array[UiAnimTarget] = _animation_targets_from_host()
 	var acts: Array[UiReactActionTarget] = _action_targets_from_host()
@@ -203,6 +170,7 @@ func _on_pressed() -> void:
 		return
 	_bind.updating = true
 	ps.set_value(true)
+	ps.set_value(false)
 	_bind.updating = false
 
 

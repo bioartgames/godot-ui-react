@@ -181,9 +181,9 @@ static func debug_wire_bind_dispatch_count_for_tests() -> int:
 ## [code](rule, source)[/code] on a method that expects [code](rule, source)[/code] first. Lambdas close over rule/source.
 static func _make_rule_cb(host: Node, rule: UiReactWireRule) -> Callable:
 	return func (_arg0: Variant = null, _arg1: Variant = null) -> void:
-		if not host.is_inside_tree():
-			return
 		if not is_instance_valid(host):
+			return
+		if not host.is_inside_tree():
 			return
 		_apply_rule(host, rule)
 
@@ -283,9 +283,9 @@ static func _bind_impl_copy_detail(
 	var sel_cb := func (_nv: Variant = null, _ov: Variant = null) -> void:
 		if rule.clear_suffix_on_selection_change and rule.suffix_note_state != null:
 			rule.suffix_note_state.set_value("")
-		if not host.is_inside_tree():
-			return
 		if not is_instance_valid(host):
+			return
+		if not host.is_inside_tree():
 			return
 		_apply_rule(host, rule)
 	if rule.trigger == UiReactWireRule.TriggerKind.SELECTION_CHANGED:
@@ -309,9 +309,9 @@ static func _bind_impl_set_string_on_bool_pulse(
 	if rule.pulse_bool == null:
 		return
 	var cb := func (new_val: Variant, old_val: Variant) -> void:
-		if not host.is_inside_tree():
-			return
 		if not is_instance_valid(host):
+			return
+		if not host.is_inside_tree():
 			return
 		rule.apply_from_pulse(host, new_val, old_val)
 	_safe_connect(conns, rule.pulse_bool.value_changed, cb)

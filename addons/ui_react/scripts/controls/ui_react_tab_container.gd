@@ -2,6 +2,7 @@ extends TabContainer
 class_name UiReactTabContainer
 
 const _UiReactExitTeardown := preload("res://addons/ui_react/scripts/internal/react/ui_react_control_exit_teardown.gd")
+const _META_TAB_CFG_LOCALIZED := &"_ui_react_tab_config_runtime_localized"
 
 var _bind := UiReactTwoWayBindingDriver.new()
 var _local_signal_scope: UiReactSubscriptionScope
@@ -32,6 +33,9 @@ var _tab_config: UiTabContainerCfg
 			_disconnect_tab_config_signals()
 		_tab_config = v
 		if is_node_ready():
+			if has_meta(_META_TAB_CFG_LOCALIZED):
+				remove_meta(_META_TAB_CFG_LOCALIZED)
+			_localize_tab_config_for_runtime()
 			_connect_tab_config_signals()
 
 ## **Optional** — Inspector-driven tweens (selection changed, focus, hover). Leave empty for no automatic animations.
@@ -87,6 +91,7 @@ func _ready() -> void:
 	_local_signal_scope = UiReactSubscriptionScope.new()
 	_local_signal_scope.connect_bound(tab_selected, _on_tab_selected)
 	_previous_tab_index = current_tab
+	_localize_tab_config_for_runtime()
 	_disconnect_all_states()
 	_connect_all_states()
 	_validate_animation_targets()
@@ -103,6 +108,15 @@ func _connect_all_states() -> void:
 	if _selected_state != null:
 		UiReactControlStateWire.bind_value_changed(self, _selected_state, &"selected_state", _on_selected_state_changed, false)
 	_connect_tab_config_signals()
+
+
+func _localize_tab_config_for_runtime() -> void:
+	if Engine.is_editor_hint() or _tab_config == null:
+		return
+	if has_meta(_META_TAB_CFG_LOCALIZED):
+		return
+	_tab_config = _tab_config.duplicate(true)
+	set_meta(_META_TAB_CFG_LOCALIZED, true)
 
 
 func _disconnect_tab_config_signals() -> void:

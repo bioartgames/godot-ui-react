@@ -12,7 +12,7 @@ func _init(initial_value: Variant = null) -> void:
 
 
 func get_value() -> Variant:
-	return value
+	return value.duplicate()
 
 
 func set_value(new_value: Variant) -> void:
@@ -44,12 +44,13 @@ func set_silent(new_value: Variant) -> void:
 	elif new_value is PackedInt32Array or new_value is PackedFloat32Array:
 		value = Array(new_value)
 	else:
-		value = []
+		push_warning("UiArrayState.set_silent() expects an Array")
+		return
 	emit_changed()
 
 
 func get_array_value() -> Array:
-	return value
+	return value.duplicate()
 
 
 func set_array_value(v: Array) -> void:

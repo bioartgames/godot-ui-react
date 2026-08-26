@@ -126,7 +126,7 @@ static func collect_control_trigger_map(action_targets: Array[UiReactActionTarge
 	return trigger_map
 
 
-## Filters invalid rows back onto [param action_targets_property], merges control triggers into [param trigger_map], and wires [signal UiBoolState.value_changed].
+## Filters invalid rows into a runtime cache, merges control triggers into [param trigger_map], and wires [signal UiBoolState.value_changed].
 static func apply_validated_actions_and_merge_triggers(
 	owner: Control,
 	component_name: String,
@@ -137,7 +137,7 @@ static func apply_validated_actions_and_merge_triggers(
 	var raw: Variant = owner.get(action_targets_property)
 	var arr: Array[UiReactActionTarget] = raw as Array[UiReactActionTarget]
 	var valid := validate_action_targets(owner, component_name, arr, allow_empty_target)
-	owner.set(action_targets_property, valid)
+	UiReactAnimTargetHelper.store_runtime_targets(owner, action_targets_property, valid)
 	for row in valid:
 		if row == null or not row.enabled or row.state_watch != null:
 			continue
@@ -214,9 +214,27 @@ static func _dispatch_state_indices(
 	UiReactReentryGuardByMeta.with_guard(owner, _META_LOCKS, key, fn_sw, warn_sw)
 
 
-static func sync_initial_state(owner: Control, component_name: String, action_targets: Array[UiReactActionTarget]) -> void:
+static func _runtime_action_targets(owner: Control) -> Array[UiReactActionTarget]:
+	var raw: Variant = null
+	if owner.has_meta(UiReactAnimTargetHelper._META_RUNTIME_TARGETS):
+		var bag: Dictionary = owner.get_meta(UiReactAnimTargetHelper._META_RUNTIME_TARGETS)
+		if bag.has(&"action_targets"):
+			return bag[&"action_targets"] as Array[UiReactActionTarget]
+	raw = owner.get(&"action_targets")
+	if raw is Array[UiReactActionTarget]:
+		return raw as Array[UiReactActionTarget]
+	var out: Array[UiReactActionTarget] = []
+	if raw is Array:
+		for it in raw as Array:
+			if it is UiReactActionTarget:
+				out.append(it as UiReactActionTarget)
+	return out
+
+
+static func sync_initial_state(owner: Control, component_name: String, _action_targets: Array[UiReactActionTarget]) -> void:
 	if not owner.is_inside_tree():
 		return
+	var action_targets := _runtime_action_targets(owner)
 	for i in range(action_targets.size()):
 		var row: UiReactActionTarget = action_targets[i]
 		if row == null or not row.enabled or row.state_watch == null:
@@ -232,6 +250,7 @@ static func run_actions(
 	respects_disabled: bool = false,
 	is_disabled: bool = false,
 ) -> void:
+	var action_targets := _runtime_action_targets(owner)
 	if action_targets.is_empty():
 		return
 	var key := "tr:%d" % int(trigger_type)

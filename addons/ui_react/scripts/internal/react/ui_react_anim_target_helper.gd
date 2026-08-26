@@ -1,6 +1,8 @@
 class_name UiReactAnimTargetHelper
 extends RefCounted
 
+const _META_RUNTIME_TARGETS := &"_ui_react_validated_target_arrays"
+
 ## How [method _run_animation_targets] filters [UiAnimTarget] rows.
 enum AnimDispatchMode {
 	## Match [member UiAnimTarget.trigger] and optional [member UiAnimTarget.selection_slot] (signal-driven).
@@ -73,9 +75,34 @@ static func validate_and_map_triggers(owner: Control, component_name: String, an
 	return result
 
 
-## Validates [param owner]'s animation targets at [param animation_targets_property] (default [code]animation_targets[/code]), assigns the filtered [UiAnimTarget] array back, and returns the trigger map.
+## Stores a validated target array for runtime dispatch without mutating [param owner]'s [param property] export.
+static func store_runtime_targets(owner: Node, property: StringName, arr: Array) -> void:
+	var bag: Dictionary = {}
+	if owner.has_meta(_META_RUNTIME_TARGETS):
+		bag = (owner.get_meta(_META_RUNTIME_TARGETS) as Dictionary).duplicate()
+	bag[property] = arr
+	owner.set_meta(_META_RUNTIME_TARGETS, bag)
+
+
+## Returns the validated runtime list when [method apply_validated_targets] has run; otherwise the export value.
+static func get_runtime_animation_targets(owner: Node, property: StringName = &"animation_targets") -> Array[UiAnimTarget]:
+	if owner.has_meta(_META_RUNTIME_TARGETS):
+		var bag: Dictionary = owner.get_meta(_META_RUNTIME_TARGETS)
+		if bag.has(property):
+			return bag[property] as Array[UiAnimTarget]
+	var raw: Variant = owner.get(property)
+	if raw is Array[UiAnimTarget]:
+		return raw as Array[UiAnimTarget]
+	var out: Array[UiAnimTarget] = []
+	if raw is Array:
+		for it in raw as Array:
+			if it is UiAnimTarget:
+				out.append(it as UiAnimTarget)
+	return out
+
+
+## Validates [param owner]'s animation targets at [param animation_targets_property] (default [code]animation_targets[/code]) into a runtime cache and returns the trigger map. Does **not** rewrite the export.
 ## Use [param allow_empty_for] like [method validate_animation_targets] (e.g. [code]UiAnimTarget.Trigger.SELECTION_CHANGED[/code] for tab selection entries with no Target path).
-## All current UiReact controls use the default property name; override only if a control uses a different export name.
 static func apply_validated_targets(
 	owner: Control,
 	component_name: String,
@@ -85,7 +112,7 @@ static func apply_validated_targets(
 	var raw: Variant = owner.get(animation_targets_property)
 	var targets: Array[UiAnimTarget] = raw as Array[UiAnimTarget]
 	var result := validate_and_map_triggers(owner, component_name, targets, allow_empty_for)
-	owner.set(animation_targets_property, result.animation_targets)
+	store_runtime_targets(owner, animation_targets_property, result.animation_targets)
 	return result.trigger_map
 
 
@@ -181,6 +208,8 @@ static func run_manual_targets(
 
 
 static func trigger_animations(owner: Node, animation_targets: Array[UiAnimTarget], trigger_type: UiAnimTarget.Trigger, respects_disabled: bool = false, is_disabled: bool = false) -> void:
+	if owner is Control:
+		animation_targets = get_runtime_animation_targets(owner, &"animation_targets")
 	if animation_targets.is_empty():
 		return
 	var sel: Dictionary = _resolve_selection_index(owner, animation_targets)

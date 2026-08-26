@@ -185,7 +185,9 @@ func play_selected_row_animation() -> void:
 		push_warning("UiReactItemList: play_selected_row_animation selected index %d out of range for item_count %d." % [i, item_count])
 		_row_play_in_progress = false
 		return
-	var row_targets: Array[UiAnimTarget] = UiReactAnimTargetHelper.collect_animation_targets_for_row_slot(animation_targets, i)
+	var row_targets: Array[UiAnimTarget] = UiReactAnimTargetHelper.collect_animation_targets_for_row_slot(
+		UiReactAnimTargetHelper.get_runtime_animation_targets(self), i
+	)
 	if row_targets.is_empty():
 		push_warning(
 			"UiReactItemList: no animation_targets with selection_slot == %d for play_selected_row_animation." % i
@@ -211,7 +213,9 @@ func play_preamble_reset_only() -> void:
 	if i < 0 or i >= item_count:
 		_row_play_in_progress = false
 		return
-	var row_targets: Array[UiAnimTarget] = UiReactAnimTargetHelper.collect_animation_targets_for_row_slot(animation_targets, i)
+	var row_targets: Array[UiAnimTarget] = UiReactAnimTargetHelper.collect_animation_targets_for_row_slot(
+		UiReactAnimTargetHelper.get_runtime_animation_targets(self), i
+	)
 	if row_targets.is_empty():
 		push_warning(
 			"UiReactItemList: no animation_targets with selection_slot == %d for play_preamble_reset_only." % i

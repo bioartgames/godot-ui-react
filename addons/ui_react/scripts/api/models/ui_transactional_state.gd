@@ -105,9 +105,9 @@ func matches_expected_binding_class(expected: StringName) -> bool:
 static func _clone_variant(v: Variant) -> Variant:
 	match typeof(v):
 		TYPE_ARRAY:
-			return (v as Array).duplicate()
+			return (v as Array).duplicate(true)
 		TYPE_DICTIONARY:
-			return (v as Dictionary).duplicate()
+			return (v as Dictionary).duplicate(true)
 		_:
 			return v
 
