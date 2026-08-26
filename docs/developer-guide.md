@@ -69,7 +69,11 @@ For product intent, examples, and the long-form control matrix, prefer `addons/u
 
 Contract GUT lives under `res://test/unit/` (outside the shipping addon). GUT is a **dev dependency** — enable it in this repo for contributors/CI; end users only need the Ui React plugin (ADR-0005).
 
-Headless runner (from project root), after GUT is installed — Wave B bootstrap (`docs/dag.md` B-00) lands the suite and exact `-gdir` / `-gprefix` flags. Until then, use editor play + examples for verification.
+Headless runner (from project root), after GUT is enabled in Project Settings:
+
+```powershell
+& "C:\Users\chris\Documents\Godot\Godot_v4.7-stable_win64.exe\Godot_v4.7-stable_win64_console.exe" --path . --headless -s addons/gut/gut_cmdln.gd -gdir=res://test/unit -gexit
+```
 
 ---
 

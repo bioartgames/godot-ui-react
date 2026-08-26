@@ -21,7 +21,7 @@ config/icon="res://icon.svg"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/ui_react/editor_plugin/plugin.cfg")
+enabled=PackedStringArray("res://addons/ui_react/editor_plugin/plugin.cfg", "res://addons/gut/plugin.cfg")
 
 [ui_react]
 
