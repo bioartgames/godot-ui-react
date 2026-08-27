@@ -299,10 +299,66 @@ Source: confirmed findings only (BUG-/GDS-/ARCH-/PAT-/TEST-). Do not expand into
 
 | Node ID | Audit IDs | Status | Depends |
 |---------|-----------|--------|---------|
-| **C-01** | TEST-019…022 | `TODO` (after B) | B-00 DONE |
-| **C-02** | TEST-023…024 | `TODO` | B-00; may follow A-05/A-08 |
-| **C-03** | TEST-025…026 | `TODO` | B-00; A-04 pressed_state pulse |
-| **C-04** | TEST-027…029 | `TODO` | B-00 |
+| **C-01** | TEST-019…022 | `DONE` | B DONE |
+| **C-02** | TEST-023…024 | `DONE` | B DONE; A-05/A-08 |
+| **C-03** | TEST-025…026 | `DONE` | B DONE; A-04 |
+| **C-04** | TEST-027…029 | `DONE` | B DONE |
+
+### PLAN C-01 (TEST-019…022) — complete
+
+| Field | Content |
+|-------|---------|
+| **Objective** | GUT for ControlStateWire bind/unbind+initial sync; SubscriptionScope connect/dispose; StateBindingHelper coerce/expect_array; StateOpService afford/subtract/transfer. |
+| **Files in scope** | **Write:** `test/unit/test_ui_c01_helpers.gd`. **Read:** control_state_wire, subscription_scope, state_binding_helper, state_op_service. |
+| **Approach** | Tree owner for wire+computed; RefCounted scope for signals; pure static for coerce/ops. Reset ComputedService in before/after. |
+| **Constraints** | ADR-0005; no `_`. |
+| **Acceptance gate** | Suite green. |
+| **Out of scope** | Full control matrix (C-03). |
+
+### PLAN C-02 (TEST-023…024) — complete
+
+| Field | Content |
+|-------|---------|
+| **Objective** | TabCollectionSync apply + resolve_tab_index; ADR-0002 export-unchanged + runtime getter after apply_validated_targets. |
+| **Files in scope** | **Write:** `test/unit/test_ui_c02_tabs_targets.gd`. |
+| **Approach** | TabContainer in tree; fresh UiTabContainerCfg; Control with invalid+valid anim targets; assert export size vs get_runtime size. |
+| **Constraints** | ADR-0002, ADR-0004. |
+| **Acceptance gate** | Suite green. |
+| **Out of scope** | Full feedback audio play. |
+
+### PLAN C-03 (TEST-025…026) — complete
+
+| Field | Content |
+|-------|---------|
+| **Objective** | ItemList selection index + debug cache hook; CheckBox/LineEdit two-way; Button pressed_state pulse (ADR-0001). |
+| **Files in scope** | **Write:** `test/unit/test_ui_c03_controls.gd`. |
+| **Approach** | add_child + await frames; pulse watch value_changed true then false. |
+| **Constraints** | ADR-0001; no `_bind` access. |
+| **Acceptance gate** | Suite green. |
+| **Out of scope** | Full tree node authoring matrix. |
+
+### PLAN C-04 (TEST-027…029) — complete
+
+| Field | Content |
+|-------|---------|
+| **Objective** | AnimValidator issue on bad target; RuntimeConsoleDebug force+capture; LiveGraphTransport no-crash maybe_* headless. |
+| **Files in scope** | **Write:** `test/unit/test_ui_c04_editor_runtime.gd`. |
+| **Approach** | Headless validators on constructed controls; force_enabled console capture; reset flags in after_each. |
+| **Constraints** | ADR-0005. |
+| **Acceptance gate** | Suite green. |
+| **Out of scope** | Full dock signal matrix (TEST-028 editor UI signals — smoke transport only). |
+
+### PREFLIGHT C-01…C-04 (batch)
+
+| Check | Verdict |
+|-------|---------|
+| Predecessors | Wave B `DONE`; A-04/A-05/A-08 `DONE`. **Pass.** |
+| File integrity | Public APIs match research. **Pass.** |
+| Rule stability | OK. **Pass.** |
+| Acceptance validity | Named APIs exist. **Pass.** |
+| Conflicts | None. **Pass.** |
+
+**Batch PREFLIGHT: GO.**
 
 All Wave C: SIGNIFICANT-as-verification / non-trivial multi-file suites; PLAN nodes when Wave B foundation is DONE.
 
@@ -366,7 +422,10 @@ Batch Continuous Improvement patterns. All **routine** for Significance unless a
 | TEST-014 | B-05 | `DONE` |
 | TEST-015 | B-06 | `DONE` |
 | TEST-016…018 | B-07 | `DONE` |
-| TEST-019…029 | C | after B |
+| TEST-019…022 | C-01 | `DONE` |
+| TEST-023…024 | C-02 | `DONE` |
+| TEST-025…026 | C-03 | `DONE` |
+| TEST-027…029 | C-04 | `DONE` |
 
 ### GDScript
 
@@ -390,7 +449,7 @@ Batch Continuous Improvement patterns. All **routine** for Significance unless a
 1. ~~User confirms DEC-001…005~~ **DONE** (2026-08-25).
 2. ~~IMPL **A-01 → A-02 → A-03**~~ **DONE**
 3. ~~For each of **A-04…A-08**: PREFLIGHT → IMPL~~ **DONE**
-4. ~~Wave B (B-00…B-07)~~ **DONE**; then Wave C PLAN/IMPL.
+4. ~~Wave B (B-00…B-07)~~ **DONE**; ~~Wave C (C-01…C-04)~~ **DONE**; then Wave D.
 5. Wave C, then Wave D batches.
 
 ## Continuous Improvement (proposals only — not applied)
