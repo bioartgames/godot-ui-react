@@ -300,9 +300,9 @@ static func _dispatch_state_watch(
 	UiReactReentryGuardByMeta.with_guard(owner, _META_LOCKS, key, fn_dispatch, warn_fb)
 
 
-static func _runtime_audio_targets(owner: Control, property: StringName = &"audio_targets") -> Array[UiReactAudioFeedbackTarget]:
-	if owner.has_meta(UiReactAnimTargetHelper._META_RUNTIME_TARGETS):
-		var bag: Dictionary = owner.get_meta(UiReactAnimTargetHelper._META_RUNTIME_TARGETS)
+static func get_runtime_audio_targets(owner: Control, property: StringName = &"audio_targets") -> Array[UiReactAudioFeedbackTarget]:
+	if owner.has_meta(UiReactAnimTargetHelper.META_RUNTIME_TARGETS):
+		var bag: Dictionary = owner.get_meta(UiReactAnimTargetHelper.META_RUNTIME_TARGETS)
 		if bag.has(property):
 			return bag[property] as Array[UiReactAudioFeedbackTarget]
 	var raw: Variant = owner.get(property)
@@ -316,9 +316,9 @@ static func _runtime_audio_targets(owner: Control, property: StringName = &"audi
 	return out
 
 
-static func _runtime_haptic_targets(owner: Control, property: StringName = &"haptic_targets") -> Array[UiReactHapticFeedbackTarget]:
-	if owner.has_meta(UiReactAnimTargetHelper._META_RUNTIME_TARGETS):
-		var bag: Dictionary = owner.get_meta(UiReactAnimTargetHelper._META_RUNTIME_TARGETS)
+static func get_runtime_haptic_targets(owner: Control, property: StringName = &"haptic_targets") -> Array[UiReactHapticFeedbackTarget]:
+	if owner.has_meta(UiReactAnimTargetHelper.META_RUNTIME_TARGETS):
+		var bag: Dictionary = owner.get_meta(UiReactAnimTargetHelper.META_RUNTIME_TARGETS)
 		if bag.has(property):
 			return bag[property] as Array[UiReactHapticFeedbackTarget]
 	var raw: Variant = owner.get(property)
@@ -340,8 +340,8 @@ static func sync_initial_state(
 ) -> void:
 	if not owner.is_inside_tree():
 		return
-	var audio_rows := _runtime_audio_targets(owner)
-	var haptic_rows := _runtime_haptic_targets(owner)
+	var audio_rows := get_runtime_audio_targets(owner)
+	var haptic_rows := get_runtime_haptic_targets(owner)
 	for i in range(audio_rows.size()):
 		var row: UiReactAudioFeedbackTarget = audio_rows[i]
 		if row == null or not row.enabled or row.state_watch == null:
@@ -361,12 +361,12 @@ static func sync_initial_state(
 static func run_audio_feedback(
 	owner: Control,
 	component_name: String,
-	audio_rows: Array[UiReactAudioFeedbackTarget],
+	_audio_rows: Array[UiReactAudioFeedbackTarget],
 	trigger_type: UiAnimTarget.Trigger,
 	respects_disabled: bool = false,
 	is_disabled: bool = false,
 ) -> void:
-	var audio_rows := _runtime_audio_targets(owner)
+	var audio_rows := get_runtime_audio_targets(owner)
 	if audio_rows.is_empty():
 		return
 	var key := "fb-audio:tr:%d" % int(trigger_type)
@@ -392,12 +392,12 @@ static func run_audio_feedback(
 static func run_haptic_feedback(
 	owner: Control,
 	component_name: String,
-	haptic_rows: Array[UiReactHapticFeedbackTarget],
+	_haptic_rows: Array[UiReactHapticFeedbackTarget],
 	trigger_type: UiAnimTarget.Trigger,
 	respects_disabled: bool = false,
 	is_disabled: bool = false,
 ) -> void:
-	var haptic_rows := _runtime_haptic_targets(owner)
+	var haptic_rows := get_runtime_haptic_targets(owner)
 	if haptic_rows.is_empty():
 		return
 	var key := "fb-haptic:tr:%d" % int(trigger_type)

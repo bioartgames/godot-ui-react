@@ -1,7 +1,7 @@
 class_name UiReactAnimTargetHelper
 extends RefCounted
 
-const _META_RUNTIME_TARGETS := &"_ui_react_validated_target_arrays"
+const META_RUNTIME_TARGETS := &"_ui_react_validated_target_arrays"
 
 ## How [method _run_animation_targets] filters [UiAnimTarget] rows.
 enum AnimDispatchMode {
@@ -78,16 +78,16 @@ static func validate_and_map_triggers(owner: Control, component_name: String, an
 ## Stores a validated target array for runtime dispatch without mutating [param owner]'s [param property] export.
 static func store_runtime_targets(owner: Node, property: StringName, arr: Array) -> void:
 	var bag: Dictionary = {}
-	if owner.has_meta(_META_RUNTIME_TARGETS):
-		bag = (owner.get_meta(_META_RUNTIME_TARGETS) as Dictionary).duplicate()
+	if owner.has_meta(META_RUNTIME_TARGETS):
+		bag = (owner.get_meta(META_RUNTIME_TARGETS) as Dictionary).duplicate()
 	bag[property] = arr
-	owner.set_meta(_META_RUNTIME_TARGETS, bag)
+	owner.set_meta(META_RUNTIME_TARGETS, bag)
 
 
 ## Returns the validated runtime list when [method apply_validated_targets] has run; otherwise the export value.
 static func get_runtime_animation_targets(owner: Node, property: StringName = &"animation_targets") -> Array[UiAnimTarget]:
-	if owner.has_meta(_META_RUNTIME_TARGETS):
-		var bag: Dictionary = owner.get_meta(_META_RUNTIME_TARGETS)
+	if owner.has_meta(META_RUNTIME_TARGETS):
+		var bag: Dictionary = owner.get_meta(META_RUNTIME_TARGETS)
 		if bag.has(property):
 			return bag[property] as Array[UiAnimTarget]
 	var raw: Variant = owner.get(property)

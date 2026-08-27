@@ -214,10 +214,10 @@ static func _dispatch_state_indices(
 	UiReactReentryGuardByMeta.with_guard(owner, _META_LOCKS, key, fn_sw, warn_sw)
 
 
-static func _runtime_action_targets(owner: Control) -> Array[UiReactActionTarget]:
+static func get_runtime_action_targets(owner: Control) -> Array[UiReactActionTarget]:
 	var raw: Variant = null
-	if owner.has_meta(UiReactAnimTargetHelper._META_RUNTIME_TARGETS):
-		var bag: Dictionary = owner.get_meta(UiReactAnimTargetHelper._META_RUNTIME_TARGETS)
+	if owner.has_meta(UiReactAnimTargetHelper.META_RUNTIME_TARGETS):
+		var bag: Dictionary = owner.get_meta(UiReactAnimTargetHelper.META_RUNTIME_TARGETS)
 		if bag.has(&"action_targets"):
 			return bag[&"action_targets"] as Array[UiReactActionTarget]
 	raw = owner.get(&"action_targets")
@@ -234,7 +234,7 @@ static func _runtime_action_targets(owner: Control) -> Array[UiReactActionTarget
 static func sync_initial_state(owner: Control, component_name: String, _action_targets: Array[UiReactActionTarget]) -> void:
 	if not owner.is_inside_tree():
 		return
-	var action_targets := _runtime_action_targets(owner)
+	var action_targets := get_runtime_action_targets(owner)
 	for i in range(action_targets.size()):
 		var row: UiReactActionTarget = action_targets[i]
 		if row == null or not row.enabled or row.state_watch == null:
@@ -245,12 +245,12 @@ static func sync_initial_state(owner: Control, component_name: String, _action_t
 static func run_actions(
 	owner: Control,
 	component_name: String,
-	action_targets: Array[UiReactActionTarget],
+	_action_targets: Array[UiReactActionTarget],
 	trigger_type: UiAnimTarget.Trigger,
 	respects_disabled: bool = false,
 	is_disabled: bool = false,
 ) -> void:
-	var action_targets := _runtime_action_targets(owner)
+	var action_targets := get_runtime_action_targets(owner)
 	if action_targets.is_empty():
 		return
 	var key := "tr:%d" % int(trigger_type)

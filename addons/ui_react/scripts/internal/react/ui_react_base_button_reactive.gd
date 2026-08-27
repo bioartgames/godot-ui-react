@@ -80,15 +80,15 @@ func _animation_targets_from_host() -> Array[UiAnimTarget]:
 
 
 func _action_targets_from_host() -> Array[UiReactActionTarget]:
-	return UiReactActionTargetHelper._runtime_action_targets(_host)
+	return UiReactActionTargetHelper.get_runtime_action_targets(_host)
 
 
 func _audio_targets_from_host() -> Array[UiReactAudioFeedbackTarget]:
-	return UiReactFeedbackTargetHelper._runtime_audio_targets(_host)
+	return UiReactFeedbackTargetHelper.get_runtime_audio_targets(_host)
 
 
 func _haptic_targets_from_host() -> Array[UiReactHapticFeedbackTarget]:
-	return UiReactFeedbackTargetHelper._runtime_haptic_targets(_host)
+	return UiReactFeedbackTargetHelper.get_runtime_haptic_targets(_host)
 
 
 func _validate_animation_targets() -> void:
