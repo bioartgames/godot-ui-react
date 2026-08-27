@@ -159,13 +159,13 @@ Source: confirmed findings only (BUG-/GDS-/ARCH-/PAT-/TEST-). Do not expand into
 | Node ID | Audit IDs | Status | Significance | Triviality | Doc sync | Pipeline |
 |---------|-----------|--------|--------------|------------|-----------|----------|
 | **B-00** | TEST foundation / DEC-005 | `DONE` | SIGNIFICANT | non-trivial | ADR-0005 + Dev Guide §5 | PLAN→PREFLIGHT→IMPL |
-| **B-01** | TEST-001…004 | `TODO` | SIGNIFICANT (with B-00) | non-trivial | none beyond B-00 | after B-00 DONE |
-| **B-02** | TEST-005…009 | `TODO` | — | non-trivial | — | UiState concrete family |
-| **B-03** | TEST-010…011 | `TODO` | — | non-trivial | — | Transactional |
-| **B-04** | TEST-012…013 | `TODO` | — | non-trivial | — | Computed resources |
-| **B-05** | TEST-014 | `TODO` | — | non-trivial | — | Wire rule `apply` / pulse |
-| **B-06** | TEST-015 | `TODO` | — | non-trivial | — | `UiAnimTarget` apply contracts |
-| **B-07** | TEST-016…018 | `TODO` | — | non-trivial | — | ComputedService, WireRuleHelper, TransactionalSession |
+| **B-01** | TEST-001…004 | `DONE` | SIGNIFICANT (with B-00) | non-trivial | none beyond B-00 | after B-00 DONE |
+| **B-02** | TEST-005…009 | `DONE` | SIGNIFICANT | non-trivial | — | UiState concrete family |
+| **B-03** | TEST-010…011 | `DONE` | SIGNIFICANT | non-trivial | — | Transactional |
+| **B-04** | TEST-012…013 | `DONE` | SIGNIFICANT | non-trivial | — | Computed resources |
+| **B-05** | TEST-014 | `DONE` | SIGNIFICANT | non-trivial | — | Wire rule `apply` / pulse |
+| **B-06** | TEST-015 | `DONE` | SIGNIFICANT | non-trivial | — | `UiAnimTarget` apply contracts |
+| **B-07** | TEST-016…018 | `DONE` | SIGNIFICANT | non-trivial | — | ComputedService, WireRuleHelper, TransactionalSession |
 
 ### PLAN B-00 — `TODO` (complete)
 
@@ -178,7 +178,120 @@ Source: confirmed findings only (BUG-/GDS-/ARCH-/PAT-/TEST-). Do not expand into
 | **Acceptance gate** | Headless GUT exits 0 with the smoke test passing; Dev Guide §5 documents the command; no `GutTest` under `addons/ui_react/`. |
 | **Out of scope** | Full Wave B-01…B-07 contract suites (separate PLAN/IMPL); CI YAML unless already in repo and trivial to point at the same command. |
 
-**PREFLIGHT B-00 / IMPL B-00:** at dispatch. B-01… require separate PLANs when scheduled (Approach = named contracts per TEST IDs).
+**PREFLIGHT B-00 / IMPL B-00:** DONE.
+
+### PLAN B-01 (TEST-001…004) — complete
+
+| Field | Content |
+|-------|---------|
+| **Objective** | Headless GUT asserts the shared `UiState` public contract: `get_value` returns the payload; `set_value` updates and emits `value_changed(new, old)` only when the value actually changes; `set_silent` updates the payload without emitting `value_changed`; two holders of the same Resource instance observe the same payload after mutation (Resource-Driven Behavior shared-identity floor). |
+| **Files in scope** | **Write:** `test/unit/test_ui_state_contracts.gd` (new); `docs/dag.md` status only. **Read:** `addons/ui_react/scripts/api/models/ui_state.gd`, `ui_bool_state.gd`, `ui_int_state.gd` (reject path for TEST-003), ADR-0005. **Do not write:** shipping `addons/ui_react/**/*.gd`; typed-family suites (B-02). |
+| **Approach** | 1. Answer Pre-Test Questions in IMPL reply (guarantees / preconditions / breakers for UiState via concrete subclass). 2. Create `GutTest` script using **`UiBoolState`** as the primary concrete observer of the abstract `UiState` API (base class is `@abstract` / push_error stubs). 3. TEST-001: watch `value_changed`; `set_value(true)` from false → one emission with `(true, false)`; second `set_value(true)` → no additional emission. 4. TEST-002: after set, `get_value()` equals stored payload; typed `get_bool_value()` may be used as public observer of the same fact (not a separate typed-family suite). 5. TEST-003: valid `set_value` path covered above; add **`UiIntState`** reject case — `set_value(1.5)` leaves prior int unchanged and does not emit `value_changed` (documented float reject). 6. TEST-004: connect to `value_changed`; `set_silent` changes `get_value` but emission count stays 0. 7. Resource shared-identity: two `UiBoolState` references to the same instance; mutate via one; both `get_value()` match. 8. Do **not** assert private `_` members; do **not** force `Engine.is_editor_hint` (headless cannot flip editor hint reliably — leave editor-hint suppression as a documented untested path in PLAN Out of scope / IMPL note). 9. Run headless GUT `-gdir=res://test/unit -gprefix=test_ui_state` (or full unit dir) and require pass. |
+| **Constraints** | ADR-0005 Accepted (test root, contract style, no private `_`); `godot-testing.mdc` Pre-Test Questions + Resource-Driven Behavior floors; alias wrappers (`set_bool_value` → `set_value`) do not need separate tests; no CB/ADR IDs in shipping code (tests may name audit IDs in comments if useful — prefer durable contract wording); B-00 DONE predecessor. |
+| **Acceptance gate** | Headless GUT: `test_ui_state_contracts.gd` — all asserts green; covers: (1) `value_changed` once on real change, (2) no emit on equal `set_value`, (3) `get_value` matches after set, (4) `set_silent` updates without `value_changed`, (5) `UiIntState` float reject leaves value unchanged, (6) shared Resource instance identity. |
+| **Out of scope** | TEST-005…009 typed-family depth (B-02); transactional (B-03); computed (B-04); editor-hint suppression of `value_changed`; production code changes unless a public-observer gap is discovered (halt + surface). |
+
+### PREFLIGHT B-01 — at dispatch
+
+| Check | Verdict |
+|-------|---------|
+| **Predecessor completeness** | B-00 `DONE`; DEC-005 `DONE`. **Pass.** |
+| **File integrity** | Target test path does not exist yet; production `ui_state.gd` / `ui_bool_state.gd` / `ui_int_state.gd` match accepted contracts (A-03/A-06 do not invalidate UiState signal/`set_value` semantics for bool/int). **Pass.** |
+| **Rule file stability** | No MDC amendment since PLAN that conflicts with ADR-0005 / godot-testing. **Pass.** |
+| **Acceptance gate validity** | Named observers (`value_changed`, `get_value`, `set_value`, `set_silent`) still exist on concrete subclasses. **Pass.** |
+| **No new conflicting findings** | No post-audit finding targets these methods beyond Wave A fixes already DONE. **Pass.** |
+
+**PREFLIGHT verdict: GO** — proceed to IMPL.
+
+### PLAN B-02 (TEST-005…009) — complete
+
+| Field | Content |
+|-------|---------|
+| **Objective** | Headless GUT asserts typed-family contracts for `UiBoolState`, `UiIntState`, `UiFloatState`, `UiStringState`, and `UiArrayState`: coercion / null defaults, documented reject paths, equal-skip / approx-skip, typed getters as public observers, and array isolation (set stores a copy; getters return a copy so in-place mutate of the result does not alter stored state). |
+| **Files in scope** | **Write:** `test/unit/test_ui_state_typed_family.gd` (new); `docs/dag.md` status. **Read:** `ui_bool_state.gd`, `ui_int_state.gd`, `ui_float_state.gd`, `ui_string_state.gd`, `ui_array_state.gd`; `test_ui_state_contracts.gd` (avoid duplicating B-01 asserts). **Do not write:** shipping addon `.gd`. |
+| **Approach** | 1. Answer Pre-Test Questions in IMPL reply (per type, focused on typed-family deltas vs B-01). 2. **TEST-005 Bool:** `set_value` coerces truthy/falsy (e.g. `1`→true); `get_bool_value` matches; equal skip already in B-01 — add coerce + typed observer only. 3. **TEST-006 Int:** `set_value(null)`→0 with emit; float reject (assert expected engine warn); `set_silent` float reject leaves value; `get_int_value` / successful int set. 4. **TEST-007 Float:** `set_value(null)`→0.0; near-equal `set_value` skips emit (`is_equal_approx`); distinct float emits; `get_float_value`. 5. **TEST-008 String:** `set_value(null)`→`""`; non-string coerces via `str()` (e.g. `42`→`"42"`); `get_string_value`. 6. **TEST-009 Array:** set from Array stores copy (mutate source after set → store unchanged); `get_array_value` / `get_value` return copy (append to result → store unchanged); `set_value(null)` clears to `[]` and emits; non-Array reject warns + no change; `PackedInt32Array` accepted; `set_silent` non-Array reject; Resource `.duplicate()` isolation — mutate original does not affect duplicate. 7. No private `_` access; no production edits unless observer gap. 8. Run headless GUT with `-gprefix=test_ui_state_typed` (or full unit dir). |
+| **Constraints** | ADR-0005; godot-testing Pre-Test Questions + Resource-Driven Behavior floors; alias wrappers that only forward (`set_bool_value`→`set_value`) need no separate test; B-01 DONE — do not re-assert base emit-on-change for bool; ADR-0003 A1 (getter copy) must hold for Array. |
+| **Acceptance gate** | Headless GUT `test_ui_state_typed_family.gd` all green; at least one assert per TEST-005…009 named contracts above. |
+| **Out of scope** | Transactional (B-03); computed (B-04); editor-hint suppression; shipping code changes. |
+
+### PREFLIGHT B-02 — at dispatch
+
+| Check | Verdict |
+|-------|---------|
+| **Predecessor completeness** | B-00 `DONE`; B-01 `DONE`. **Pass.** |
+| **File integrity** | Typed state scripts unchanged since Wave A (array getters already copy; set_silent reject in place). Test path new. **Pass.** |
+| **Rule file stability** | No conflicting MDC change. **Pass.** |
+| **Acceptance gate validity** | Public methods/signals cited still exist. **Pass.** |
+| **No new conflicting findings** | None targeting these files beyond closed Wave A. **Pass.** |
+
+**PREFLIGHT verdict: GO** — proceed to IMPL.
+
+### PLAN B-03 (TEST-010…011) — complete
+
+| Field | Content |
+|-------|---------|
+| **Objective** | GUT asserts `UiTransactionalState` draft/commit isolation (incl. nested dict) and `UiTransactionalGroup` batch begin/apply/cancel with null-skip. |
+| **Files in scope** | **Write:** `test/unit/test_ui_transactional_contracts.gd`. **Read:** `ui_transactional_state.gd`, `ui_transactional_group.gd`. |
+| **Approach** | Resource-only tests: begin_edit/set_value/apply/cancel/has_pending; nested dict draft mutation leaves committed; group with null hole + two states apply_all/cancel_all/begin_edit_all. |
+| **Constraints** | ADR-0003 A2; ADR-0005; no `_` access. |
+| **Acceptance gate** | Suite green headless. |
+| **Out of scope** | Session register (B-07); production edits. |
+
+### PLAN B-04 (TEST-012…013) — complete
+
+| Field | Content |
+|-------|---------|
+| **Objective** | GUT asserts `UiComputedBoolInvert.recompute`/`compute_bool` (empty→true, invert) and at least one string computed `recompute` path. |
+| **Files in scope** | **Write:** `test/unit/test_ui_computed_resources.gd`. **Read:** computed bool/string models. |
+| **Approach** | Direct `recompute()` on concrete subclasses; assign `sources`; assert getters; no service wiring (B-07). |
+| **Constraints** | ADR-0005; cannot instantiate abstract bases. |
+| **Acceptance gate** | Suite green. |
+| **Out of scope** | ComputedService auto-wire (B-07). |
+
+### PLAN B-05 (TEST-014) — complete
+
+| Field | Content |
+|-------|---------|
+| **Objective** | GUT asserts representative wire `apply` outputs + `apply_from_pulse` rising-edge contract. |
+| **Files in scope** | **Write:** `test/unit/test_ui_wire_rule_apply.gd`. **Read:** map/sync/sort/pulse rule scripts. |
+| **Approach** | Direct apply(null) for MapIntToString, SyncBoolDebugLine, SortArrayByKey; pulse rising vs falling for SetStringOnBoolPulse. |
+| **Constraints** | ADR-0005; no private `_`. |
+| **Acceptance gate** | Suite green. |
+| **Out of scope** | Full helper attach matrix (covered lightly in B-07). |
+
+### PLAN B-06 (TEST-015) — complete
+
+| Field | Content |
+|-------|---------|
+| **Objective** | GUT asserts `UiAnimTarget.apply` empty-target no-op Signal; `apply_to_control` valid FADE_IN returns awaitable Signal. |
+| **Files in scope** | **Write:** `test/unit/test_ui_anim_target.gd`. **Read:** `ui_anim_target.gd`. |
+| **Approach** | Build Control owner+target in tree; empty path → empty Signal; FADE_IN duration>0 → await completion. |
+| **Constraints** | ADR-0005; scene tree required. |
+| **Acceptance gate** | Suite green. |
+| **Out of scope** | Full animation enum matrix; preamble RESET polish. |
+
+### PLAN B-07 (TEST-016…018) — complete
+
+| Field | Content |
+|-------|---------|
+| **Objective** | GUT asserts ComputedService wire/cycle/reset hooks; WireRuleHelper dispatch count + attach/detach smoke; TransactionalSession register press → apply_all. |
+| **Files in scope** | **Write:** `test/unit/test_ui_services_contracts.gd`. **Read:** computed_service, wire_rule_helper, transactional_session. |
+| **Approach** | before_each/after_each reset computed tables; ensure_wired+debug_is_wired; cycle graph; dispatch count==6; Button in tree register APPLY + pressed.emit; unregister. |
+| **Constraints** | ADR-0005; use `*_for_tests` hooks only; always unregister hosts. |
+| **Acceptance gate** | Suite green; tables empty after reset. |
+| **Out of scope** | Full binder matrix; screen config variants. |
+
+### PREFLIGHT B-03…B-07 (batch dispatch)
+
+| Check | Verdict |
+|-------|---------|
+| Predecessor | B-00…B-02 `DONE`. **Pass.** |
+| File integrity | Production APIs match research; new test paths only. **Pass.** |
+| Rule stability | No conflicting MDC. **Pass.** |
+| Acceptance validity | Named public methods/hooks exist. **Pass.** |
+| No conflicting findings | None. **Pass.** |
+
+**Batch PREFLIGHT: GO** for B-03…B-07 in parallel.
 
 ---
 
@@ -246,7 +359,13 @@ Batch Continuous Improvement patterns. All **routine** for Significance unless a
 
 | Audit IDs | Wave | Status |
 |-----------|------|--------|
-| TEST-001…018 | B | `TODO` after B-00 (DEC-005 `DONE`) |
+| TEST-001…004 | B-01 | `DONE` |
+| TEST-005…009 | B-02 | `DONE` |
+| TEST-010…011 | B-03 | `DONE` |
+| TEST-012…013 | B-04 | `DONE` |
+| TEST-014 | B-05 | `DONE` |
+| TEST-015 | B-06 | `DONE` |
+| TEST-016…018 | B-07 | `DONE` |
 | TEST-019…029 | C | after B |
 
 ### GDScript
@@ -271,7 +390,7 @@ Batch Continuous Improvement patterns. All **routine** for Significance unless a
 1. ~~User confirms DEC-001…005~~ **DONE** (2026-08-25).
 2. ~~IMPL **A-01 → A-02 → A-03**~~ **DONE**
 3. ~~For each of **A-04…A-08**: PREFLIGHT → IMPL~~ **DONE**
-4. ~~PREFLIGHT → IMPL **B-00**~~ **DONE**; then PLAN/IMPL **B-01…**.
+4. ~~Wave B (B-00…B-07)~~ **DONE**; then Wave C PLAN/IMPL.
 5. Wave C, then Wave D batches.
 
 ## Continuous Improvement (proposals only — not applied)
