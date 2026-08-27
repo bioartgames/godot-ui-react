@@ -1,4 +1,4 @@
-## Maps Dependency Graph node ids ([UiReactExplainGraphBuilder]) to live [UiState] on the edited scene (**CB-058** step 2 canvas reconnect).
+## Maps Dependency Graph node ids ([UiReactExplainGraphBuilder]) to live [UiState] on the edited scene (canvas reconnect).
 class_name UiReactGraphNodeStateResolver
 extends RefCounted
 

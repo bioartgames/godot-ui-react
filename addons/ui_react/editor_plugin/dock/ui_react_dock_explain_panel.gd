@@ -1,4 +1,4 @@
-## Editor dock tab: declarative dependency snapshot ([code]CB-018A[/code]) plus visual graph layout ([code]CB-018A.5[/code]) for the graph workbench.
+## Editor dock tab: declarative dependency snapshot plus visual graph layout and details narrative for the graph workbench.
 ## The graph and embedded wire-rules list also perform authoring edits (rebind, disconnect, new link, scope presets, create state) via [UiReactActionController] and graph edit services—not a read-only viewer.
 class_name UiReactDockExplainPanel
 extends MarginContainer
@@ -966,7 +966,7 @@ func _fill_selection_wire_submenu(popup: PopupMenu) -> void:
 		popup.set_item_disabled(cr_i, sel_ix < 0)
 
 
-## Fills nested **Wire → Stacks** from [UiReactWireRuleStackCatalog] ([code]CB-063[/code]).
+## Fills nested **Wire → Stacks** from [UiReactWireRuleStackCatalog].
 func _fill_wire_stacks_submenu(p: PopupMenu) -> void:
 	p.clear()
 	var sentry: Array[Dictionary] = _WireStackCatalogScript.stack_entries()
@@ -4656,7 +4656,7 @@ func _set_hint_visible(on: bool) -> void:
 		_hint.custom_minimum_size = Vector2(0, h)
 
 
-## While **Play scene** is running, transient **Scene dock** selection loss would clear the graph and break **CB-018** live pulses; keep the last successful layout for the same edited [code]scene_file_path[/code] instead.
+## While **Play scene** is running, transient **Scene dock** selection loss would clear the graph and break live graph pulses; keep the last successful layout for the same edited [code]scene_file_path[/code] instead.
 func _retain_last_graph_if_playing_scene(root: Node) -> bool:
 	if root == null or _plugin == null or _graph_view == null:
 		return false

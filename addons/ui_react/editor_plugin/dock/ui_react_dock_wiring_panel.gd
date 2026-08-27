@@ -1,3 +1,4 @@
+## Wiring tab panel in the Ui React editor dock (explain graph and editor play-mode controls).
 extends MarginContainer
 class_name UiReactDockWiringPanel
 

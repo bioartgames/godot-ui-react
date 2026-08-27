@@ -31,7 +31,7 @@ static func animate_expand(source_node: Node, target: Control, speed := UiAnimCo
 		if not tween:
 			return Signal()
 		
-		tween.tween_property(target, 'scale', UiAnimConstants.SCALE_MAX, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
+		tween.tween_property(target, "scale", UiAnimConstants.SCALE_MAX, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
 		
 		if auto_reset:
 			tween.finished.connect(func(): target.scale = UiAnimConstants.SCALE_MAX)
@@ -83,7 +83,7 @@ static func animate_expand_x(source_node: Node, target: Control, speed := UiAnim
 		if not tween:
 			return Signal()
 		
-		tween.tween_property(target, 'scale:x', UiAnimConstants.SCALE_MAX.x, speed).set_trans(Tween.TRANS_CUBIC).set_ease(easing)
+		tween.tween_property(target, "scale:x", UiAnimConstants.SCALE_MAX.x, speed).set_trans(Tween.TRANS_CUBIC).set_ease(easing)
 		
 		return tween.finished
 	
@@ -133,7 +133,7 @@ static func animate_expand_y(source_node: Node, target: Control, speed := UiAnim
 		if not tween:
 			return Signal()
 		
-		tween.tween_property(target, 'scale:y', UiAnimConstants.SCALE_MAX.y, speed).set_trans(Tween.TRANS_CUBIC).set_ease(easing)
+		tween.tween_property(target, "scale:y", UiAnimConstants.SCALE_MAX.y, speed).set_trans(Tween.TRANS_CUBIC).set_ease(easing)
 		
 		return tween.finished
 	
@@ -180,7 +180,7 @@ static func animate_shrink(source_node: Node, target: Control, speed := UiAnimCo
 		if not tween:
 			return Signal()
 		
-		tween.tween_property(target, 'scale', UiAnimConstants.SCALE_MIN, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
+		tween.tween_property(target, "scale", UiAnimConstants.SCALE_MIN, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
 		
 		if auto_visible:
 			tween.finished.connect(func(): target.visible = false)
@@ -225,7 +225,7 @@ static func animate_shrink_x(source_node: Node, target: Control, speed := UiAnim
 		if not tween:
 			return Signal()
 		
-		tween.tween_property(target, 'scale:x', UiAnimConstants.ALPHA_MIN, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
+		tween.tween_property(target, "scale:x", UiAnimConstants.ALPHA_MIN, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
 		
 		if auto_visible:
 			tween.finished.connect(func(): target.visible = false)
@@ -271,7 +271,7 @@ static func animate_shrink_y(source_node: Node, target: Control, speed := UiAnim
 		if not tween:
 			return Signal()
 		
-		tween.tween_property(target, 'scale:y', UiAnimConstants.ALPHA_MIN, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
+		tween.tween_property(target, "scale:y", UiAnimConstants.ALPHA_MIN, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
 		
 		if auto_visible:
 			tween.finished.connect(func(): target.visible = false)
@@ -305,7 +305,7 @@ static func animate_bounce_in(source_node: Node, target: Control, speed := UiAni
 		if not tween:
 			return Signal()
 		
-		tween.tween_property(target, 'scale', UiAnimConstants.SCALE_MAX, speed).set_trans(Tween.TRANS_BOUNCE).set_ease(easing)
+		tween.tween_property(target, "scale", UiAnimConstants.SCALE_MAX, speed).set_trans(Tween.TRANS_BOUNCE).set_ease(easing)
 		
 		return tween.finished
 	
@@ -345,7 +345,7 @@ static func animate_bounce_out(source_node: Node, target: Control, speed := UiAn
 		if not tween:
 			return Signal()
 		
-		tween.tween_property(target, 'scale', UiAnimConstants.SCALE_MIN, speed).set_trans(Tween.TRANS_BOUNCE).set_ease(easing)
+		tween.tween_property(target, "scale", UiAnimConstants.SCALE_MIN, speed).set_trans(Tween.TRANS_BOUNCE).set_ease(easing)
 		
 		if auto_visible:
 			tween.finished.connect(func(): target.visible = false)
@@ -387,7 +387,7 @@ static func animate_elastic_in(source_node: Node, target: Control, speed := UiAn
 		if not tween:
 			return Signal()
 		
-		tween.tween_property(target, 'scale', UiAnimConstants.SCALE_MAX, speed).set_trans(Tween.TRANS_ELASTIC).set_ease(easing)
+		tween.tween_property(target, "scale", UiAnimConstants.SCALE_MAX, speed).set_trans(Tween.TRANS_ELASTIC).set_ease(easing)
 		
 		return tween.finished
 	
@@ -426,7 +426,7 @@ static func animate_elastic_out(source_node: Node, target: Control, speed := UiA
 		if not tween:
 			return Signal()
 		
-		tween.tween_property(target, 'scale', UiAnimConstants.SCALE_MIN, speed).set_trans(Tween.TRANS_ELASTIC).set_ease(easing)
+		tween.tween_property(target, "scale", UiAnimConstants.SCALE_MIN, speed).set_trans(Tween.TRANS_ELASTIC).set_ease(easing)
 		
 		if auto_visible:
 			tween.finished.connect(func(): target.visible = false)
@@ -470,9 +470,9 @@ static func animate_pop(source_node: Node, target: Control, speed := UiAnimConst
 			return Signal()
 		
 		# First tween: scale to overshoot
-		tween.tween_property(target, 'scale', Vector2(overshoot, overshoot) * UiAnimConstants.SCALE_MAX, speed * _POP_OVERSHOOT_PHASE_FRACTION).set_trans(Tween.TRANS_BACK).set_ease(easing)
+		tween.tween_property(target, "scale", Vector2(overshoot, overshoot) * UiAnimConstants.SCALE_MAX, speed * _POP_OVERSHOOT_PHASE_FRACTION).set_trans(Tween.TRANS_BACK).set_ease(easing)
 		# Second tween: settle back to 1.0
-		tween.tween_property(target, 'scale', UiAnimConstants.SCALE_MAX, speed * _POP_SETTLE_PHASE_FRACTION).set_trans(Tween.TRANS_BACK).set_ease(easing)
+		tween.tween_property(target, "scale", UiAnimConstants.SCALE_MAX, speed * _POP_SETTLE_PHASE_FRACTION).set_trans(Tween.TRANS_BACK).set_ease(easing)
 		
 		return tween.finished
 	

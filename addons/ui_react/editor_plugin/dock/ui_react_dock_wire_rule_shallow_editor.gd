@@ -1,4 +1,4 @@
-## Dock quick-edit strip for descriptor-allowlisted [code]wire_rules[/code] fields (CB-058 Milestone 2).
+## Dock quick-edit strip for descriptor-allowlisted [code]wire_rules[/code] shallow fields.
 class_name UiReactDockWireRuleShallowEditor
 extends VBoxContainer
 

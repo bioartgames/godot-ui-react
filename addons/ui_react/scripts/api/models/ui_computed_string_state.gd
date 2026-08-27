@@ -9,8 +9,10 @@ extends UiStringState
 @export var sources: Array[UiState] = []
 
 
+## Refreshes [member value] from [method compute_string] and propagates updates like [method set_value].
 func recompute() -> void:
 	set_value(compute_string())
 
 
+## Subclasses implement the derived string from [member sources].
 @abstract func compute_string() -> String

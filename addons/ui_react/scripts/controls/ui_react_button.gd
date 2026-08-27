@@ -1,10 +1,6 @@
+## Reactive [Button] with optional two-way [UiBoolState] bindings, Inspector animation/action/feedback targets, and transactional host wiring.
 extends Button
 class_name UiReactButton
-
-var _bind := UiReactTwoWayBindingDriver.new()
-var _pressed_state: UiBoolState
-var _disabled_state: UiBoolState
-var _reactive: UiReactBaseButtonReactive
 
 ## Two-way binding for pressed state ([bool]). **Optional** — omit for a normal Button without external state sync.
 @export var pressed_state: UiBoolState:
@@ -48,6 +44,11 @@ var _reactive: UiReactBaseButtonReactive
 ## **Optional** — [UiTransactionalGroup] cohort (Apply/Cancel) via [UiReactTransactionalSession]. Same subresource [member UiReactTransactionalHostBinding.screen] on both buttons when sharing config.
 @export var transactional_host: UiReactTransactionalHostBinding
 
+var _bind := UiReactTwoWayBindingDriver.new()
+var _pressed_state: UiBoolState
+var _disabled_state: UiBoolState
+var _reactive: UiReactBaseButtonReactive
+
 
 func _lazy_rx() -> UiReactBaseButtonReactive:
 	if _reactive == null:
@@ -59,6 +60,10 @@ func _enter_tree() -> void:
 	_lazy_rx().on_enter_tree()
 
 
+func _ready() -> void:
+	_lazy_rx().on_ready()
+
+
 func _exit_tree() -> void:
 	_lazy_rx().on_exit_tree()
 
@@ -66,10 +71,6 @@ func _exit_tree() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		_lazy_rx().on_predelete()
-
-
-func _ready() -> void:
-	_lazy_rx().on_ready()
 
 
 func _finish_initialization() -> void:

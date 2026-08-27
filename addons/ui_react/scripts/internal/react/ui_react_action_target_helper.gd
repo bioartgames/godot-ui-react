@@ -14,32 +14,6 @@ const _LiveGraph := preload(
 	"res://addons/ui_react/scripts/runtime/ui_react_live_graph_transport.gd"
 )
 
-class _StateWatchBinding extends RefCounted:
-	var _owner: WeakRef
-	var _component: String
-	var _rows: Array[UiReactActionTarget]
-	var _indices: PackedInt32Array
-	var _state: UiBoolState
-
-	func _init(
-		owner: Control,
-		component: String,
-		rows: Array[UiReactActionTarget],
-		indices: PackedInt32Array,
-		state: UiBoolState,
-	) -> void:
-		_owner = weakref(owner)
-		_component = component
-		_rows = rows
-		_indices = indices
-		_state = state
-
-	func on_value_changed(_new_value: Variant, _old_value: Variant) -> void:
-		var o: Control = _owner.get_ref() as Control
-		if o == null:
-			return
-		UiReactActionTargetHelper._dispatch_state_indices(o, _component, _rows, _indices)
-
 
 ## Call before [method UiReactControlStateWire.unbind_value_changed] on the same control. Clears [code]state_watch[/code] connections and action reentry-lock meta.
 static func teardown_for_control_exit(owner: Control) -> void:
@@ -350,3 +324,30 @@ static func _apply_row(owner: Control, row: UiReactActionTarget, row_index: int,
 			)
 		UiReactActionTarget.UiReactActionKind.SET_FLOAT_LITERAL:
 			UiReactStateOpService.set_float_literal(row.float_literal_target, row.float_literal_value)
+
+
+class _StateWatchBinding extends RefCounted:
+	var _owner: WeakRef
+	var _component: String
+	var _rows: Array[UiReactActionTarget]
+	var _indices: PackedInt32Array
+	var _state: UiBoolState
+
+	func _init(
+		owner: Control,
+		component: String,
+		rows: Array[UiReactActionTarget],
+		indices: PackedInt32Array,
+		state: UiBoolState,
+	) -> void:
+		_owner = weakref(owner)
+		_component = component
+		_rows = rows
+		_indices = indices
+		_state = state
+
+	func on_value_changed(_new_value: Variant, _old_value: Variant) -> void:
+		var o: Control = _owner.get_ref() as Control
+		if o == null:
+			return
+		UiReactActionTargetHelper._dispatch_state_indices(o, _component, _rows, _indices)

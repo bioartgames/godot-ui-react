@@ -38,7 +38,7 @@ const _SEL_SUB_CREATE_BIND_ROOT := 1264
 const _SEL_SUB_WIRE_ADD_RULE_ROOT := 1265
 const _SEL_ACT_FOCUS_INSPECTOR := 1180
 const _SEL_ACT_WIRE_ADD_BASE := 1210
-## Nested [b]Wire → Stacks[/b] preset submenu root ([code]CB-063[/code]). Sibling to stack row ids, not a stack action id.
+## Nested [b]Wire → Stacks[/b] preset submenu root. Sibling to stack row ids, not a stack action id.
 const _SEL_ACT_WIRE_STACK_SUBMENU_ROOT := 1279
 ## Base id for "Add stack: …" items (32 slots: 1280–1311). [br]Placed at 1280+ because 1240+ is [code]create-bind[/code] and 1260+ is submenu roots.
 const _SEL_ACT_WIRE_STACK_ADD_BASE := 1280

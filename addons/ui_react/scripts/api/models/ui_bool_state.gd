@@ -11,10 +11,12 @@ func _init(initial_value: Variant = false) -> void:
 		value = bool(initial_value)
 
 
+## Returns [member value] as [Variant] for [UiState] bindings.
 func get_value() -> Variant:
 	return value
 
 
+## Coerces [param new_value] to [bool], updates [member value], and emits [signal value_changed] when it changes.
 func set_value(new_value: Variant) -> void:
 	var v := bool(new_value)
 	if value == v:
@@ -26,14 +28,17 @@ func set_value(new_value: Variant) -> void:
 	emit_changed()
 
 
+## Coerces [param new_value] to [bool] and updates [member value] without emitting [signal value_changed].
 func set_silent(new_value: Variant) -> void:
 	value = bool(new_value)
 	emit_changed()
 
 
+## Returns [member value] as [bool].
 func get_bool_value() -> bool:
 	return value
 
 
+## Sets [member value] via [method set_value].
 func set_bool_value(v: bool) -> void:
 	set_value(v)

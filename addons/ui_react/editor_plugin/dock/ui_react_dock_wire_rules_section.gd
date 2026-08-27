@@ -1,4 +1,4 @@
-## Embedded [code]wire_rules[/code] list under the Dependency Graph details ([code]CB-058[/code]); row actions stay inline.
+## Embedded [code]wire_rules[/code] list under the Dependency Graph details; row actions stay inline.
 class_name UiReactDockWireRulesSection
 extends VBoxContainer
 
@@ -19,7 +19,7 @@ var _after_wire_mutated: Callable = Callable()
 
 var _rules_scroll: ScrollContainer
 var _rules_container: VBoxContainer
-var _shallow_editor = null
+var _shallow_editor: UiReactDockWireRuleShallowEditor = null
 
 var _target: Node = null
 var _edited_scene_root: Node = null
@@ -124,7 +124,7 @@ func append_rule_from_catalog_index(catalog_idx: int) -> void:
 	_commit_wire_rules(arr, "Ui React: Add wire rule")
 
 
-## Appends a built-in recipe from [UiReactWireRuleStackCatalog] in one [code]_commit_wire_rules[/code] / undo step ([code]CB-063[/code]).
+## Appends a built-in recipe from [UiReactWireRuleStackCatalog] in one [code]_commit_wire_rules[/code] / undo step.
 func append_stack_from_catalog_index(stack_idx: int) -> void:
 	if _target == null or _actions == null:
 		return

@@ -1,4 +1,4 @@
-## Curated multi-rule [UiReactWireRule] **stacks** for the editor [code]CB-063[/code] — static recipes only, no on-disk author library in MVP.
+## Curated multi-rule [UiReactWireRule] **stacks** for the editor **Wire → Stacks** menu — static recipes only, no on-disk author library in MVP.
 ## Mirrors the pattern of [UiReactWireRuleCatalog]; use [method instantiate_stack] to append a stack in one undo step from the Wire → Stacks RMB path.
 class_name UiReactWireRuleStackCatalog
 extends Object

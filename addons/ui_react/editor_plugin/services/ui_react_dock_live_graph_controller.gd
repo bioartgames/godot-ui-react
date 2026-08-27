@@ -1,4 +1,4 @@
-## Pure helpers: correlate debugger payloads → graph **draw edge** indices and node ids (**CB-018** live pulses).
+## Pure helpers: correlate debugger payloads → graph **draw edge** indices and node ids (live graph pulses).
 class_name UiReactDockLiveGraphController
 extends RefCounted
 

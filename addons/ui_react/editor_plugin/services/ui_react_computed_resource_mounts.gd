@@ -1,4 +1,4 @@
-## Finds scene [Control] + [code]computed_context[/code] for a file-backed [UiComputed*] resource (**[code]CB-058[/code]** follow-on).
+## Finds scene [Control] + [code]computed_context[/code] for a file-backed [UiComputed*] resource.
 class_name UiReactComputedResourceMounts
 extends RefCounted
 

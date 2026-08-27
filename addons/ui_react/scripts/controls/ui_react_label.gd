@@ -1,11 +1,8 @@
+## Display-only reactive [Label] with [UiState] text binding (including nested/computed payloads) and optional Inspector animation/feedback targets.
 extends Label
 class_name UiReactLabel
 
 const _UiReactExitTeardown := preload("res://addons/ui_react/scripts/internal/react/ui_react_control_exit_teardown.gd")
-
-var _bind := UiReactTwoWayBindingDriver.new()
-var _local_signal_scope: UiReactSubscriptionScope
-var _text_state: UiState
 
 ## Two-way binding for displayed text ([String] or nested structures — see [method _as_text]).
 ## [member text_state] accepts [UiStringState], [UiComputedStringState], [UiArrayState], or [UiTransactionalState] whose committed/draft payload matches string or array via [member UiTransactionalState.matches_expected_binding_class]; [code]@export[/code] is typed [UiState] so transactional scenes stay valid ([code]docs/WIRING_LAYER.md[/code] §7.2).
@@ -30,7 +27,11 @@ var _text_state: UiState
 ## **Optional** — Feedback ([code]docs/FEEDBACK_LAYER.md[/code]): [method Input.start_joy_vibration] on triggers.
 @export var haptic_targets: Array[UiReactHapticFeedbackTarget] = []
 
+var _bind := UiReactTwoWayBindingDriver.new()
+var _local_signal_scope: UiReactSubscriptionScope
+var _text_state: UiState
 var _nested_states: Array[UiState] = []
+
 
 func _ready() -> void:
 	if _local_signal_scope != null:
@@ -80,7 +81,6 @@ func _validate_animation_targets() -> void:
 	var trigger_map: Dictionary = UiReactAnimTargetHelper.apply_validated_targets(self, "UiReactLabel")
 	UiReactFeedbackTargetHelper.apply_validated_audio_and_haptic_and_merge_triggers(self, "UiReactLabel", trigger_map)
 
-	# Connect signals based on which triggers are used
 	if trigger_map.has(UiAnimTarget.Trigger.HOVER_ENTER):
 		_local_signal_scope.connect_bound(mouse_entered, _on_trigger_hover_enter)
 	if trigger_map.has(UiAnimTarget.Trigger.HOVER_EXIT):
@@ -96,7 +96,6 @@ func _finish_initialization() -> void:
 
 ## Handles TEXT_CHANGED trigger animations.
 func _on_trigger_text_changed(_new_value: Variant, _old_value: Variant) -> void:
-	# Skip animations during initialization
 	if _bind.initializing:
 		return
 
@@ -132,7 +131,6 @@ func _on_text_state_changed(new_value: Variant, old_value: Variant) -> void:
 
 	text = new_text
 
-	# Trigger animations if configured
 	if animation_targets.size() > 0 or audio_targets.size() > 0 or haptic_targets.size() > 0:
 		_on_trigger_text_changed(new_value, old_value)
 

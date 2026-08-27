@@ -1,15 +1,9 @@
+## Reactive [Tree] driven by [UiReactTreeNode] hierarchies; [member selected_state] uses visible pre-order row indices ([code]-1[/code] when nothing selected).
 extends Tree
 class_name UiReactTree
 
 const _TREE_NODE_SCRIPT: Script = preload("res://addons/ui_react/scripts/api/models/ui_react_tree_node.gd")
 const _UiReactExitTeardown := preload("res://addons/ui_react/scripts/internal/react/ui_react_control_exit_teardown.gd")
-
-var _bind := UiReactTwoWayBindingDriver.new()
-var _local_signal_scope: UiReactSubscriptionScope
-var _tree_items_state: UiArrayState
-var _selected_state: UiIntState
-var _last_tree_items_signature: String = ""
-var _have_tree_items_structure_sig: bool = false
 
 ## Hierarchical row data. Assign a [UiArrayState] whose [member UiArrayState.value] is an [Array] of [UiReactTreeNode].
 ## Top-level nodes are created as children of the tree root (with [member hide_root] [code]true[/code], the root row is hidden; visible index [code]0[/code] is the first top-level row).
@@ -53,6 +47,13 @@ var _have_tree_items_structure_sig: bool = false
 ## **Optional** — Wiring rules ([code]docs/WIRING_LAYER.md[/code] §5). Applied by [UiReactWireRuleHelper] via [UiReactHostWireTree].
 @export var wire_rules: Array[UiReactWireRule] = []
 
+var _bind := UiReactTwoWayBindingDriver.new()
+var _local_signal_scope: UiReactSubscriptionScope
+var _tree_items_state: UiArrayState
+var _selected_state: UiIntState
+var _last_tree_items_signature: String = ""
+var _have_tree_items_structure_sig: bool = false
+
 
 func _enter_tree() -> void:
 	UiReactHostWireTree.on_enter(self)
@@ -74,15 +75,6 @@ func _disconnect_local_control_signals() -> void:
 		_local_signal_scope = null
 
 
-func _exit_tree() -> void:
-	_reactive_teardown()
-
-
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE:
-		_reactive_teardown()
-
-
 func _ready() -> void:
 	select_mode = SELECT_SINGLE
 	if _local_signal_scope != null:
@@ -94,6 +86,15 @@ func _ready() -> void:
 	_connect_all_states()
 	_validate_animation_targets()
 	UiReactStateBindingHelper.deferred_finish_initialization(self)
+
+
+func _exit_tree() -> void:
+	_reactive_teardown()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		_reactive_teardown()
 
 
 func _disconnect_all_states() -> void:

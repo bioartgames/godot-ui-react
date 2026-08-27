@@ -1,3 +1,4 @@
+## Editor debugger plugin that forwards live graph protocol messages to the dock graph sink.
 @tool
 class_name UiReactLiveGraphEditorDebuggerPlugin
 extends EditorDebuggerPlugin

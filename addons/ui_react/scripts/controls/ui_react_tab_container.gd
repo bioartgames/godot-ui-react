@@ -1,13 +1,9 @@
+## Reactive [TabContainer] with optional tab-index [UiIntState] binding, dynamic [UiTabContainerCfg], tab transitions, wire rules, and Inspector targets.
 extends TabContainer
 class_name UiReactTabContainer
 
 const _UiReactExitTeardown := preload("res://addons/ui_react/scripts/internal/react/ui_react_control_exit_teardown.gd")
 const _META_TAB_CFG_LOCALIZED := &"_ui_react_tab_config_runtime_localized"
-
-var _bind := UiReactTwoWayBindingDriver.new()
-var _local_signal_scope: UiReactSubscriptionScope
-var _selected_state: UiIntState
-var _tab_config: UiTabContainerCfg
 
 ## Two-way binding for current tab index ([int]). **Optional** — assign for external control of selection.
 @export var selected_state: UiIntState:
@@ -53,6 +49,10 @@ var _tab_config: UiTabContainerCfg
 ## **Optional** — Wiring rules ([code]docs/WIRING_LAYER.md[/code] §5). Applied by [UiReactWireRuleHelper] via [UiReactHostWireTree].
 @export var wire_rules: Array[UiReactWireRule] = []
 
+var _bind := UiReactTwoWayBindingDriver.new()
+var _local_signal_scope: UiReactSubscriptionScope
+var _selected_state: UiIntState
+var _tab_config: UiTabContainerCfg
 var _previous_tab_index: int = -1
 
 
@@ -76,15 +76,6 @@ func _disconnect_local_control_signals() -> void:
 		_local_signal_scope = null
 
 
-func _exit_tree() -> void:
-	_reactive_teardown()
-
-
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE:
-		_reactive_teardown()
-
-
 func _ready() -> void:
 	if _local_signal_scope != null:
 		_local_signal_scope.dispose()
@@ -96,6 +87,15 @@ func _ready() -> void:
 	_connect_all_states()
 	_validate_animation_targets()
 	UiReactStateBindingHelper.deferred_finish_initialization(self)
+
+
+func _exit_tree() -> void:
+	_reactive_teardown()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		_reactive_teardown()
 
 
 func _disconnect_all_states() -> void:

@@ -22,7 +22,7 @@ static func animate_rotate_in(source_node: Node, target: Control, speed := UiAni
 		if not tween:
 			return Signal()
 		
-		tween.tween_property(target, 'rotation_degrees', 0.0, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
+		tween.tween_property(target, "rotation_degrees", 0.0, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
 		
 		return tween.finished
 	
@@ -56,7 +56,7 @@ static func animate_rotate_out(source_node: Node, target: Control, speed := UiAn
 		if not tween:
 			return Signal()
 		
-		tween.tween_property(target, 'rotation_degrees', end_angle, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
+		tween.tween_property(target, "rotation_degrees", end_angle, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
 		
 		if auto_visible:
 			tween.finished.connect(func(): target.visible = false)
@@ -101,8 +101,8 @@ static func animate_pulse(source_node: Node, target: Control, speed := UiAnimCon
 		
 		# Create pulse cycles
 		for i in range(pulse_count):
-			tween.tween_property(target, 'scale', Vector2(pulse_amount, pulse_amount) * original_scale, speed * 0.5).set_trans(Tween.TRANS_SINE).set_ease(easing)
-			tween.tween_property(target, 'scale', original_scale, speed * 0.5).set_trans(Tween.TRANS_SINE).set_ease(easing)
+			tween.tween_property(target, "scale", Vector2(pulse_amount, pulse_amount) * original_scale, speed * 0.5).set_trans(Tween.TRANS_SINE).set_ease(easing)
+			tween.tween_property(target, "scale", original_scale, speed * 0.5).set_trans(Tween.TRANS_SINE).set_ease(easing)
 		
 		return tween.finished
 	
@@ -126,7 +126,7 @@ static func animate_shake(source_node: Node, target: Control, speed := UiAnimCon
 		return Signal()
 
 	var track_baseline: bool = UiAnimBaselineApplyContext.is_enabled()
-	var snapshot = null
+	var snapshot: UiAnimSnapshotStore.ControlStateSnapshot = null
 	if track_baseline:
 		snapshot = UiAnimSnapshotStore.acquire_unified_snapshot(source_node, target)
 	var saved_position: Vector2
@@ -154,8 +154,8 @@ static func animate_shake(source_node: Node, target: Control, speed := UiAnimCon
 			var offset_x = intensity * (1.0 if i % 2 == 0 else -1.0)
 			var y_index = int(i * 0.5)
 			var offset_y = intensity * 0.5 * (1.0 if y_index % 2 == 0 else -1.0)
-			tween.tween_property(target, 'position', original_position + Vector2(offset_x, offset_y), shake_duration * 0.5).set_trans(Tween.TRANS_SINE).set_ease(easing)
-			tween.tween_property(target, 'position', original_position, shake_duration * 0.5).set_trans(Tween.TRANS_SINE).set_ease(easing)
+			tween.tween_property(target, "position", original_position + Vector2(offset_x, offset_y), shake_duration * 0.5).set_trans(Tween.TRANS_SINE).set_ease(easing)
+			tween.tween_property(target, "position", original_position, shake_duration * 0.5).set_trans(Tween.TRANS_SINE).set_ease(easing)
 		
 		return tween.finished
 	
@@ -192,9 +192,9 @@ static func animate_breathing(source_node: Node, target: Control, duration: floa
 			return Signal()
 		
 		# Scale up
-		tween.tween_property(target, 'scale', original_scale * UiAnimConstants.BREATHING_SCALE_MULTIPLIER, duration * 0.5).set_trans(Tween.TRANS_SINE).set_ease(easing)
+		tween.tween_property(target, "scale", original_scale * UiAnimConstants.BREATHING_SCALE_MULTIPLIER, duration * 0.5).set_trans(Tween.TRANS_SINE).set_ease(easing)
 		# Scale down
-		tween.tween_property(target, 'scale', original_scale, duration * 0.5).set_trans(Tween.TRANS_SINE).set_ease(easing)
+		tween.tween_property(target, "scale", original_scale, duration * 0.5).set_trans(Tween.TRANS_SINE).set_ease(easing)
 		
 		return tween.finished
 	
@@ -229,11 +229,11 @@ static func animate_wobble(source_node: Node, target: Control, duration: float =
 			return Signal()
 		
 		# Rotate left
-		tween.tween_property(target, 'rotation_degrees', original_rotation - UiAnimConstants.WOBBLE_ROTATION_DEGREES, duration * 0.5).set_trans(Tween.TRANS_SINE).set_ease(easing)
+		tween.tween_property(target, "rotation_degrees", original_rotation - UiAnimConstants.WOBBLE_ROTATION_DEGREES, duration * 0.5).set_trans(Tween.TRANS_SINE).set_ease(easing)
 		# Rotate right
-		tween.tween_property(target, 'rotation_degrees', original_rotation + UiAnimConstants.WOBBLE_ROTATION_DEGREES, duration * 0.5).set_trans(Tween.TRANS_SINE).set_ease(easing)
+		tween.tween_property(target, "rotation_degrees", original_rotation + UiAnimConstants.WOBBLE_ROTATION_DEGREES, duration * 0.5).set_trans(Tween.TRANS_SINE).set_ease(easing)
 		# Back to center
-		tween.tween_property(target, 'rotation_degrees', original_rotation, duration * 0.5).set_trans(Tween.TRANS_SINE).set_ease(easing)
+		tween.tween_property(target, "rotation_degrees", original_rotation, duration * 0.5).set_trans(Tween.TRANS_SINE).set_ease(easing)
 		
 		return tween.finished
 	
@@ -257,7 +257,7 @@ static func animate_float(source_node: Node, target: Control, duration: float = 
 		target.visible = true
 
 	var track_baseline: bool = UiAnimBaselineApplyContext.is_enabled()
-	var snapshot = null
+	var snapshot: UiAnimSnapshotStore.ControlStateSnapshot = null
 	if track_baseline:
 		snapshot = UiAnimSnapshotStore.acquire_unified_snapshot(source_node, target)
 	var saved_position: Vector2
@@ -278,9 +278,9 @@ static func animate_float(source_node: Node, target: Control, duration: float = 
 		var original_position = saved_position
 		
 		# Move up
-		tween.tween_property(target, 'position:y', original_position.y - float_distance, duration * 0.5).set_trans(Tween.TRANS_SINE).set_ease(easing)
+		tween.tween_property(target, "position:y", original_position.y - float_distance, duration * 0.5).set_trans(Tween.TRANS_SINE).set_ease(easing)
 		# Move down
-		tween.tween_property(target, 'position:y', original_position.y, duration * 0.5).set_trans(Tween.TRANS_SINE).set_ease(easing)
+		tween.tween_property(target, "position:y", original_position.y, duration * 0.5).set_trans(Tween.TRANS_SINE).set_ease(easing)
 		
 		return tween.finished
 

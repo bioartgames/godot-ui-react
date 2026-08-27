@@ -1,4 +1,4 @@
-## Per-anchor narrative for the Dependency Graph details pane ([code]CB-018A.5[/code]).
+## Per-anchor narrative for the Dependency Graph details pane.
 ## Layout scope remains on [UiReactExplainGraphSnapshot] [code]upstream_ids[/code] / [code]downstream_ids[/code].
 class_name UiReactExplainGraphNarrative
 extends RefCounted

@@ -1,4 +1,4 @@
-## Graph canvas for Dependency Graph visual mode ([code]CB-018A.1[/code]–[code]CB-018A.3[/code]); [b]Shift+drag[/b] reconnect + [b]Ctrl+Shift+drag[/b] new link (**[code]CB-058[/code]**).
+## Graph canvas for Dependency Graph visual mode; [b]Shift+drag[/b] reconnect + [b]Ctrl+Shift+drag[/b] new link.
 class_name UiReactExplainGraphView
 extends Control
 
@@ -10,9 +10,9 @@ signal reconnect_drag_started(edge_index: int, origin_node_id: String)
 ## [param target_node_id] is empty if cancelled, released on canvas, or invalid; panel validates and commits.
 signal reconnect_drag_ended(edge_index: int, origin_node_id: String, target_node_id: String)
 signal newlink_drag_started(donor_node_id: String)
-## [param target_node_id] empty if cancel / no hit; requires no edge selected when starting (**[code]CB-058[/code]** phase 2b).
+## [param target_node_id] empty if cancel / no hit; requires no edge selected when starting.
 signal newlink_drag_ended(donor_node_id: String, target_node_id: String)
-## **Delete** / **Backspace** with an edge selected (**[code]CB-058[/code]** slice 1); panel decides if disconnect applies.
+## **Delete** / **Backspace** with an edge selected; panel decides if disconnect applies.
 signal edge_disconnect_requested(edge_index: int)
 ## Right-click on a **node or edge** hit (after [method _pick]); panel shows selection Actions [PopupMenu].
 signal context_menu_requested(at_local_pos: Vector2)
@@ -95,7 +95,7 @@ var _show_all_edge_labels: bool = false
 var _canvas_bg := Color(0.1, 0.11, 0.13, 1.0)
 var _canvas_border := Color(0.38, 0.4, 0.46, 0.65)
 
-## Live graph pulse (**CB-018**): draw indices → expiry [Time.get_ticks_msec].
+## Live graph pulse: draw indices → expiry [Time.get_ticks_msec].
 var _live_edge_until: Dictionary = {}
 var _live_node_until: Dictionary = {}
 
@@ -305,7 +305,7 @@ func fit_content_to_view() -> void:
 	queue_redraw()
 
 
-## Pans so [param node_id]'s center aligns with the inner drawable center; zoom unchanged (**CB-018** live follow).
+## Pans so [param node_id]'s center aligns with the inner drawable center; zoom unchanged (live follow).
 func scroll_graph_to_node_id(node_id: String) -> void:
 	if node_id.is_empty() or _layout.is_empty():
 		return

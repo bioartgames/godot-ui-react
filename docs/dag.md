@@ -370,20 +370,41 @@ Batch Continuous Improvement patterns. All **routine** for Significance unless a
 
 | Node ID | Audit IDs | Status | Theme | Explicit file scope (from audit) |
 |---------|-----------|--------|-------|----------------------------------|
-| **D-01** | GDS-001…021 | `TODO` | Remove ticket IDs (`CB-*`) from shipping `##` / comments; replace with durable local intent | explain_graph_view, dock_explain_panel, dock, dock_config, wire_rules_section, explain_menu_ids, wire_rule_shallow_editor, runtime_console_debug, live_graph_protocol, live_graph_transport, graph_node_state_resolver, wire_rule_catalog, dock_live_graph_controller, computed_resource_mounts, wire_graph_edit_service, computed_graph_rebind, explain_graph_layout, explain_graph_builder, wire_rule_stack_catalog, graph_new_binding_service, explain_graph_narrative |
-| **D-02** | GDS-022…038 | `TODO` | Add class-level `##` | All listed controls + dock + wiring_panel + live_graph_editor_debugger_plugin + anim_target_helper |
-| **D-03** | GDS-039…051 | `TODO` | Export before member vars (script organization) | All UiReact* controls listed in audit |
-| **D-04** | GDS-052…059 | `TODO` | Virtual order: `_ready` before `_exit_tree` | button, texture_button, check_box, line_edit, option_button, item_list, tab_container, tree |
-| **D-05** | GDS-060…065 | `TODO` | Inner classes last | computed_service, action_target_helper, feedback_target_helper, anim_target_helper, snapshot_store, explain_graph_builder |
-| **D-06** | GDS-066…069 | `TODO` | Typed null locals | opacity_color_animations, transform_effects (×2), dock_wire_rules_section |
-| **D-07** | GDS-070…076, GDS-090 | `TODO` | Public API `##` on UiState family + wire_rule.apply + compute_bool | ui_state, ui_*_state, ui_react_wire_rule, ui_computed_bool_invert |
-| **D-08** | GDS-077…080 | `TODO` | Double-quote tween property paths | opacity/scale/slide/transform anim files |
-| **D-09** | GDS-081…088 | `TODO` | Delete restating comments | check_box, line_edit, label, option_button, item_list, slider, progress_bar, opacity_color_animations |
-| **D-10** | GDS-089 | `TODO` | Two blank lines between top-level funcs | `ui_anim_opacity_color_animations.gd` |
+| **D-01** | GDS-001…021 | `DONE` | Remove ticket IDs (`CB-*`) from shipping `##` / comments; replace with durable local intent | explain_graph_view, dock_explain_panel, dock, dock_config, wire_rules_section, explain_menu_ids, wire_rule_shallow_editor, runtime_console_debug, live_graph_protocol, live_graph_transport, graph_node_state_resolver, wire_rule_catalog, dock_live_graph_controller, computed_resource_mounts, wire_graph_edit_service, computed_graph_rebind, explain_graph_layout, explain_graph_builder, wire_rule_stack_catalog, graph_new_binding_service, explain_graph_narrative |
+| **D-02** | GDS-022…038 | `DONE` | Add class-level `##` | All listed controls + dock + wiring_panel + live_graph_editor_debugger_plugin + anim_target_helper |
+| **D-03** | GDS-039…051 | `DONE` | Export before member vars (script organization) | All UiReact* controls listed in audit |
+| **D-04** | GDS-052…059 | `DONE` | Virtual order: `_ready` before `_exit_tree` | button, texture_button, check_box, line_edit, option_button, item_list, tab_container, tree |
+| **D-05** | GDS-060…065 | `DONE` | Inner classes last | computed_service, action_target_helper, feedback_target_helper, anim_target_helper, snapshot_store, explain_graph_builder |
+| **D-06** | GDS-066…069 | `DONE` | Typed null locals | opacity_color_animations, transform_effects (×2), dock_wire_rules_section |
+| **D-07** | GDS-070…076, GDS-090 | `DONE` | Public API `##` on UiState family + wire_rule.apply + compute_bool | ui_state, ui_*_state, ui_react_wire_rule, ui_computed_bool_invert |
+| **D-08** | GDS-077…080 | `DONE` | Double-quote tween property paths | opacity/scale/slide/transform anim files |
+| **D-09** | GDS-081…088 | `DONE` | Delete restating comments | check_box, line_edit, label, option_button, item_list, slider, progress_bar, opacity_color_animations |
+| **D-10** | GDS-089 | `DONE` | Two blank lines between top-level funcs | `ui_anim_opacity_color_animations.gd` |
+
+### PLAN D-01…D-10 (batch) — complete
+
+| Field | Content |
+|-------|---------|
+| **Objective** | Shipping `addons/ui_react` GDScript matches godot-gdscript hygiene floors cited by GDS-001…090: no ticket IDs in comments; class/`##` coverage; export-before-members; `_ready` before `_exit_tree`; inner classes last; typed nulls; double-quoted tween paths; no restating `#` comments; blank-line spacing on opacity anim file. |
+| **Files in scope** | **Write:** paths listed per D-* row above under `addons/ui_react/` only. **Read:** godot-gdscript conventions. **Do not write:** `addons/gut/`, `test/`, README ticket mentions (optional later). |
+| **Approach** | Parallel lanes without file collision: (1) D-01 strip/replace `CB-*` in ##/comments with durable prose; (2) D-07 add `##` on public UiState/wire API; (3) per-control pass D-02+D-03+D-04+D-09; (4) D-05 move inner classes to file end; (5) anim cluster D-06→D-08→D-10 (and D-09 on opacity) in one agent. No behavior changes. |
+| **Constraints** | godot-gdscript.mdc; no ADR/DAG IDs in shipping comments; do not change public method signatures; Triviality fails (multi-file) hence PLAN; routine Significance. |
+| **Acceptance gate** | `rg CB- addons/ui_react --glob '*.gd'` → 0; headless GUT `res://test/unit` still all pass; spot-check one control has `@export` before private members and `_ready` before `_exit_tree`. |
+| **Out of scope** | 100-char line wrap wave; README/example CB-* cleanup; behavior fixes. |
+
+### PREFLIGHT D-01…D-10 (batch)
+
+| Check | Verdict |
+|-------|---------|
+| Predecessors | Waves A–C `DONE`. **Pass.** |
+| File integrity | Hygiene-only; Wave A helper public API already fixed. **Pass.** |
+| Rule stability | OK. **Pass.** |
+| Acceptance validity | GUT suite exists; CB grep measurable. **Pass.** |
+| Conflicts | None. **Pass.** |
+
+**Batch PREFLIGHT: GO.**
 
 **Out of wave (explicit):** bulk 100-char line wrap (audit measured 1261 lines) — schedule only if a later milestone opens a formatting wave; not required to close M-AUDIT correctness.
-
-**PLAN stubs:** create six-field PLANs when a D-* batch is selected for IMPL; keep Approach mechanical (search/replace + organization reorder only).
 
 ---
 
@@ -449,8 +470,8 @@ Batch Continuous Improvement patterns. All **routine** for Significance unless a
 1. ~~User confirms DEC-001…005~~ **DONE** (2026-08-25).
 2. ~~IMPL **A-01 → A-02 → A-03**~~ **DONE**
 3. ~~For each of **A-04…A-08**: PREFLIGHT → IMPL~~ **DONE**
-4. ~~Wave B (B-00…B-07)~~ **DONE**; ~~Wave C (C-01…C-04)~~ **DONE**; then Wave D.
-5. Wave C, then Wave D batches.
+4. ~~Wave B (B-00…B-07)~~ **DONE**; ~~Wave C (C-01…C-04)~~ **DONE**; ~~Wave D (D-01…D-10)~~ **DONE**
+5. ~~Wave C, then Wave D batches~~ **DONE** — M-AUDIT correctness + contract tests + GDS hygiene closed (100-char wrap still out of wave).
 
 ## Continuous Improvement (proposals only — not applied)
 

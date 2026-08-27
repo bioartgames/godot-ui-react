@@ -1,4 +1,4 @@
-## Runtime (**CB-018C**) — one-line [code]print[/code] trace to editor **Output** for wire/computed/action orchestration (**debug builds**).
+## Runtime console trace — one-line [code]print[/code] trace to editor **Output** for wire/computed/action orchestration (**debug builds**).
 ## Toggle via **Ui React** **Graph** tab footer **Play in editor** (**[member UiReactDockConfig.KEY_EDITOR_PLAY_MODE]** modes that include **Output trace**); persists [code]console_debug_enabled[/code] (**[member UiReactDockConfig.KEY_RUNTIME_CONSOLE_DEBUG_ENABLED]**), synced by **`UiReactDockConfig.sync_runtime_keys_from_editor_play_mode`**. No autoload buffer.
 extends RefCounted
 class_name UiReactRuntimeConsoleDebug

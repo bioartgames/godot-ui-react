@@ -9,14 +9,17 @@ extends Resource
 signal value_changed(new_value: Variant, old_value: Variant)
 
 
+## Returns the current payload. Subclasses must override.
 func get_value() -> Variant:
 	push_error("UiState.get_value() must be overridden in subclass")
 	return null
 
 
+## Assigns a new payload and emits [signal value_changed] when it changes. Subclasses must override.
 func set_value(_new_value: Variant) -> void:
 	push_error("UiState.set_value() must be overridden in subclass")
 
 
+## Assigns a new payload without emitting [signal value_changed]. Subclasses must override.
 func set_silent(_new_value: Variant) -> void:
 	push_error("UiState.set_silent() must be overridden in subclass")

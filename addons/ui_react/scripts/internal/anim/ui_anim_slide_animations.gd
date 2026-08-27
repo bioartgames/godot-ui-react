@@ -39,7 +39,7 @@ static func animate_slide_from_left(source_node: Node, target: Control, offset :
 		var tween := UiAnimTweenFactory.create_safe_tween(source_node)
 		if not tween:
 			return Signal()
-		tween.tween_property(target, 'position:x', offset, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
+		tween.tween_property(target, "position:x", offset, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
 
 		return tween.finished
 
@@ -63,7 +63,7 @@ static func animate_slide_to_left(source_node: Node, target: Control, _offset :=
 		var tween := UiAnimTweenFactory.create_safe_tween(source_node)
 		if not tween:
 			return Signal()
-		tween.tween_property(target, 'position:x', -target.size.x, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
+		tween.tween_property(target, "position:x", -target.size.x, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
 
 		if auto_visible:
 			tween.finished.connect(func(): target.visible = false)
@@ -126,7 +126,7 @@ static func animate_slide_to_right(source_node: Node, target: Control, _offset :
 		var tween := UiAnimTweenFactory.create_safe_tween(source_node)
 		if not tween:
 			return Signal()
-		tween.tween_property(target, 'position:x', viewport.size.x, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
+		tween.tween_property(target, "position:x", viewport.size.x, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
 
 		if auto_visible:
 			tween.finished.connect(func(): target.visible = false)
@@ -155,7 +155,7 @@ static func animate_slide_from_top(source_node: Node, target: Control, offset: f
 		var tween := UiAnimTweenFactory.create_safe_tween(source_node)
 		if not tween:
 			return Signal()
-		tween.tween_property(target, 'position:y', offset, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
+		tween.tween_property(target, "position:y", offset, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
 
 		return tween.finished
 
@@ -178,7 +178,7 @@ static func animate_slide_to_top(source_node: Node, target: Control, speed := Ui
 		var tween := UiAnimTweenFactory.create_safe_tween(source_node)
 		if not tween:
 			return Signal()
-		tween.tween_property(target, 'position:y', -target.size.y, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
+		tween.tween_property(target, "position:y", -target.size.y, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
 
 		if auto_visible:
 			tween.finished.connect(func(): target.visible = false)
@@ -206,7 +206,7 @@ static func animate_from_left_to_center(source_node: Node, target: Control, spee
 		var tween := UiAnimTweenFactory.create_safe_tween(source_node)
 		if not tween:
 			return Signal()
-		tween.tween_property(target, 'position:x', UiAnimTweenFactory.get_node_center(source_node, target), speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
+		tween.tween_property(target, "position:x", UiAnimTweenFactory.get_node_center(source_node, target), speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
 
 		return tween.finished
 
@@ -229,7 +229,7 @@ static func animate_from_center_to_left(source_node: Node, target: Control, spee
 		var tween := UiAnimTweenFactory.create_safe_tween(source_node)
 		if not tween:
 			return Signal()
-		tween.tween_property(target, 'position:x', -target.size.x, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
+		tween.tween_property(target, "position:x", -target.size.x, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
 
 		if auto_visible:
 			tween.finished.connect(func(): target.visible = false)
@@ -262,7 +262,7 @@ static func animate_from_right_to_center(source_node: Node, target: Control, spe
 		if not tween:
 			return Signal()
 
-		tween.tween_property(target, 'position:x', UiAnimTweenFactory.get_node_center(source_node, target), speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
+		tween.tween_property(target, "position:x", UiAnimTweenFactory.get_node_center(source_node, target), speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
 
 		return tween.finished
 
@@ -285,7 +285,7 @@ static func animate_from_center_to_right(source_node: Node, target: Control, spe
 		var tween := UiAnimTweenFactory.create_safe_tween(source_node)
 		if not tween:
 			return Signal()
-		tween.tween_property(target, 'position:x', target.size.x, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
+		tween.tween_property(target, "position:x", target.size.x, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
 
 		if auto_visible:
 			tween.finished.connect(func(): target.visible = false)
@@ -320,7 +320,7 @@ static func animate_slide_from_bottom(source_node: Node, target: Control, offset
 		if not tween:
 			return Signal()
 
-		tween.tween_property(target, 'position:y', (viewport_size - target.size.y) - offset, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
+		tween.tween_property(target, "position:y", (viewport_size - target.size.y) - offset, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
 
 		return tween.finished
 
@@ -348,7 +348,7 @@ static func animate_slide_to_bottom(source_node: Node, target: Control, speed :=
 		if not tween:
 			return Signal()
 
-		tween.tween_property(target, 'position:y', viewport.get_visible_rect().size.y, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
+		tween.tween_property(target, "position:y", viewport.get_visible_rect().size.y, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
 
 		if auto_visible:
 			tween.finished.connect(func(): target.visible = false)
@@ -370,7 +370,7 @@ static func animate_from_top_to_center(source_node: Node, target: Control, speed
 		if not tween:
 			return Signal()
 
-		tween.tween_property(target, 'position:y', UiAnimTweenFactory.get_node_center_y(source_node, target), speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
+		tween.tween_property(target, "position:y", UiAnimTweenFactory.get_node_center_y(source_node, target), speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
 
 		return tween.finished
 
@@ -394,7 +394,7 @@ static func animate_from_center_to_top(source_node: Node, target: Control, speed
 		if not tween:
 			return Signal()
 
-		tween.tween_property(target, 'position:y', -target.size.y, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
+		tween.tween_property(target, "position:y", -target.size.y, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
 
 		if auto_visible:
 			tween.finished.connect(func(): target.visible = false)
@@ -427,7 +427,7 @@ static func animate_from_bottom_to_center(source_node: Node, target: Control, sp
 		if not tween:
 			return Signal()
 
-		tween.tween_property(target, 'position:y', UiAnimTweenFactory.get_node_center_y(source_node, target), speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
+		tween.tween_property(target, "position:y", UiAnimTweenFactory.get_node_center_y(source_node, target), speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
 
 		return tween.finished
 
@@ -455,7 +455,7 @@ static func animate_from_center_to_bottom(source_node: Node, target: Control, sp
 		if not tween:
 			return Signal()
 
-		tween.tween_property(target, 'position:y', viewport.get_visible_rect().size.y, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
+		tween.tween_property(target, "position:y", viewport.get_visible_rect().size.y, speed).set_trans(Tween.TRANS_BACK).set_ease(easing)
 
 		if auto_visible:
 			tween.finished.connect(func(): target.visible = false)

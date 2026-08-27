@@ -26,15 +26,6 @@ static var _flush_scheduled: bool = false
 static var _reenter_depth: Dictionary = {} # int -> int
 
 
-class WiredEntry:
-	var computed: UiState
-	var deps: Array[UiState] = []
-	var dep_callable: Callable
-	var consumer_weak: WeakRef = null
-	## [code][dep, consumer, chain_binding][/code] for nested [UiComputed*] in [code]sources[/code] (released when this computed unwires).
-	var nested_to_release: Array = []
-
-
 static func hook_bind(state: UiState, consumer: Node, binding: StringName) -> void:
 	ensure_wired(state, consumer, binding)
 
@@ -288,3 +279,12 @@ static func _trigger_recompute_safe(computed: UiState) -> void:
 		_reenter_depth.erase(cid)
 	else:
 		_reenter_depth[cid] = after
+
+
+class WiredEntry:
+	var computed: UiState
+	var deps: Array[UiState] = []
+	var dep_callable: Callable
+	var consumer_weak: WeakRef = null
+	## [code][dep, consumer, chain_binding][/code] for nested [UiComputed*] in [code]sources[/code] (released when this computed unwires).
+	var nested_to_release: Array = []

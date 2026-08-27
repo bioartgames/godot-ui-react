@@ -7,50 +7,6 @@ const _META_LOCKS := &"_ui_react_feedback_locks"
 const _META_SW_BINDINGS := &"_ui_react_feedback_sw_bindings"
 
 
-class _FeedbackStateWatchBinding extends RefCounted:
-	var _owner: WeakRef
-	var _component_name: String
-	var _audio_rows: Array[UiReactAudioFeedbackTarget]
-	var _audio_indices: PackedInt32Array
-	var _haptic_rows: Array[UiReactHapticFeedbackTarget]
-	var _haptic_indices: PackedInt32Array
-	var _state: UiBoolState
-
-	func _init(
-		owner: Control,
-		component_name: String,
-		audio_rows: Array[UiReactAudioFeedbackTarget],
-		audio_indices: PackedInt32Array,
-		haptic_rows: Array[UiReactHapticFeedbackTarget],
-		haptic_indices: PackedInt32Array,
-		state: UiBoolState,
-	) -> void:
-		_owner = weakref(owner)
-		_component_name = component_name
-		_audio_rows = audio_rows
-		_audio_indices = audio_indices
-		_haptic_rows = haptic_rows
-		_haptic_indices = haptic_indices
-		_state = state
-
-	func on_value_changed(_new_value: Variant, _old_value: Variant) -> void:
-		var o: Control = _owner.get_ref() as Control
-		if o == null:
-			return
-		var nu := UiReactStateBindingHelper.coerce_bool(_new_value)
-		var ou := UiReactStateBindingHelper.coerce_bool(_old_value)
-		if not nu or ou:
-			return
-		UiReactFeedbackTargetHelper._dispatch_state_watch(
-			o,
-			_component_name,
-			_audio_rows,
-			_audio_indices,
-			_haptic_rows,
-			_haptic_indices
-		)
-
-
 static func teardown_for_control_exit(owner: Control) -> void:
 	if owner == null:
 		return
@@ -459,3 +415,47 @@ static func _apply_haptic_row(
 	var w := clampf(row.weak_magnitude, 0.0, 1.0)
 	var s := clampf(row.strong_magnitude, 0.0, 1.0)
 	Input.start_joy_vibration(dev, w, s, row.duration_sec)
+
+
+class _FeedbackStateWatchBinding extends RefCounted:
+	var _owner: WeakRef
+	var _component_name: String
+	var _audio_rows: Array[UiReactAudioFeedbackTarget]
+	var _audio_indices: PackedInt32Array
+	var _haptic_rows: Array[UiReactHapticFeedbackTarget]
+	var _haptic_indices: PackedInt32Array
+	var _state: UiBoolState
+
+	func _init(
+		owner: Control,
+		component_name: String,
+		audio_rows: Array[UiReactAudioFeedbackTarget],
+		audio_indices: PackedInt32Array,
+		haptic_rows: Array[UiReactHapticFeedbackTarget],
+		haptic_indices: PackedInt32Array,
+		state: UiBoolState,
+	) -> void:
+		_owner = weakref(owner)
+		_component_name = component_name
+		_audio_rows = audio_rows
+		_audio_indices = audio_indices
+		_haptic_rows = haptic_rows
+		_haptic_indices = haptic_indices
+		_state = state
+
+	func on_value_changed(_new_value: Variant, _old_value: Variant) -> void:
+		var o: Control = _owner.get_ref() as Control
+		if o == null:
+			return
+		var nu := UiReactStateBindingHelper.coerce_bool(_new_value)
+		var ou := UiReactStateBindingHelper.coerce_bool(_old_value)
+		if not nu or ou:
+			return
+		UiReactFeedbackTargetHelper._dispatch_state_watch(
+			o,
+			_component_name,
+			_audio_rows,
+			_audio_indices,
+			_haptic_rows,
+			_haptic_indices
+		)

@@ -1,4 +1,4 @@
-## Lists empty registry binding exports compatible with a donor [UiState] for Dependency Graph **new link** (**[code]CB-058[/code]** phase 2b); optional-only **clear** for slice1 disconnect.
+## Lists empty registry binding exports compatible with a donor [UiState] for Dependency Graph **new link**; optional-only **clear** for graph disconnect.
 class_name UiReactGraphNewBindingService
 extends RefCounted
 
@@ -35,7 +35,7 @@ static func try_commit_clear_binding_export(
 	return true
 
 
-## Registry binding matrix for the graph details **Connections** section ([code]CB-018A.5[/code]).
+## Registry binding matrix for the graph details **Connections** section.
 static func list_registry_binding_rows(host: Control, component: String) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if host == null or component.is_empty():

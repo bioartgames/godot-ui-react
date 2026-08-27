@@ -11,10 +11,12 @@ func _init(initial_value: Variant = null) -> void:
 		value = (initial_value as Array).duplicate()
 
 
+## Returns a duplicate of [member value] as [Variant] for [UiState] bindings.
 func get_value() -> Variant:
 	return value.duplicate()
 
 
+## Duplicates [param new_value] into [member value] and emits [signal value_changed] when it changes.
 func set_value(new_value: Variant) -> void:
 	var next: Array = []
 	if new_value == null:
@@ -36,6 +38,7 @@ func set_value(new_value: Variant) -> void:
 	emit_changed()
 
 
+## Duplicates [param new_value] into [member value] without emitting [signal value_changed].
 func set_silent(new_value: Variant) -> void:
 	if new_value == null:
 		value = []
@@ -49,9 +52,11 @@ func set_silent(new_value: Variant) -> void:
 	emit_changed()
 
 
+## Returns a duplicate of [member value].
 func get_array_value() -> Array:
 	return value.duplicate()
 
 
+## Sets [member value] via [method set_value].
 func set_array_value(v: Array) -> void:
 	set_value(v)

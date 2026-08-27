@@ -34,10 +34,10 @@ const KEY_EDITOR_BOTTOM_PANEL_SHORTCUT_JSON := "ui_react/settings/shortcuts/bott
 const KEY_OPEN_DIAGNOSTICS_SHORTCUT_JSON := "ui_react/settings/shortcuts/open_diagnostics_json"
 const KEY_OPEN_WIRING_SHORTCUT_JSON := "ui_react/settings/shortcuts/open_wiring_json"
 
-## Runtime (**CB-018 live graph pulses**): opt-in (**[member UiReactDockConfig.KEY_RUNTIME_GRAPH_LIVE_PULSES_ENABLED]**); persists from **Graph** tab footer.
+## Runtime live graph pulses: opt-in (**[member UiReactDockConfig.KEY_RUNTIME_GRAPH_LIVE_PULSES_ENABLED]**); persists from **Graph** tab footer.
 const KEY_RUNTIME_GRAPH_LIVE_PULSES_ENABLED := "ui_react/settings/runtime/graph_live_pulses_enabled"
 
-## Runtime (**CB-018C**): console trace toggle; persisted from **Graph** tab only (`save_ui_preference`).
+## Runtime console trace toggle; persisted from **Graph** tab only (`save_ui_preference`).
 const KEY_RUNTIME_CONSOLE_DEBUG_ENABLED := "ui_react/settings/runtime/console_debug_enabled"
 
 ## Combined **Play in editor** mode for **Graph** tab footer; synced to **[member KEY_RUNTIME_CONSOLE_DEBUG_ENABLED]** and **[member KEY_RUNTIME_GRAPH_LIVE_PULSES_ENABLED]** (runtime gates unchanged).

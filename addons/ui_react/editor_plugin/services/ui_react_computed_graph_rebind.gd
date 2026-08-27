@@ -1,4 +1,4 @@
-## Resolves [code]computed_context[/code] paths from [Dependency Graph] (**CB-058** slice 3) and commits [code]sources[i][/code] on [UiComputedStringState] / [UiComputedBoolState] with undo via [UiReactActionController].
+## Resolves [code]computed_context[/code] paths from [Dependency Graph] and commits [code]sources[i][/code] on [UiComputedStringState] / [UiComputedBoolState] with undo via [UiReactActionController].
 class_name UiReactComputedGraphRebind
 extends RefCounted
 
@@ -55,7 +55,7 @@ static func try_commit_replace_source(
 	)
 
 
-## Clears [code]sources[source_index][/code] to [code]null[/code] (**[code]CB-058[/code]** slice 1 graph disconnect).
+## Clears [code]sources[source_index][/code] to [code]null[/code] (graph disconnect).
 static func try_commit_clear_source(
 	host: Control,
 	computed_context: String,
@@ -160,7 +160,7 @@ static func _try_commit_sources_index(
 			return false
 
 
-## Swaps [code]sources[index_a][/code] and [code]sources[index_b][/code] (**[code]CB-058[/code]** follow-on).
+## Swaps [code]sources[index_a][/code] and [code]sources[index_b][/code].
 static func try_commit_swap_sources(
 	host: Control,
 	computed_context: String,
@@ -181,7 +181,7 @@ static func try_commit_swap_sources(
 	return _try_commit_sources_array_mutation(host, computed_context, actions, ul, mut_swap)
 
 
-## Removes [code]sources[source_index][/code] and compacts the array (**[code]CB-058[/code]** follow-on).
+## Removes [code]sources[source_index][/code] and compacts the array.
 static func try_commit_remove_source_at(
 	host: Control,
 	computed_context: String,
@@ -314,7 +314,7 @@ static func _mutate_path_sources_mutate(cur: Variant, path: String, mutator: Cal
 	return _replace_child(cur, step, inner_new)
 
 
-## Fills first null / non-[UiState] [code]sources[/code] slot, or appends if all slots hold [UiState] and size [i]<[/i] [_MAX_COMPUTED_SOURCES] (**[code]CB-058[/code]** phase 2b).
+## Fills first null / non-[UiState] [code]sources[/code] slot, or appends if all slots hold [UiState] and size [i]<[/i] [_MAX_COMPUTED_SOURCES].
 static func try_commit_append_or_fill_source(
 	host: Control,
 	computed_context: String,

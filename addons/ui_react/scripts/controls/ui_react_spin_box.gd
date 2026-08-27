@@ -1,12 +1,8 @@
+## Reactive [SpinBox] with optional two-way value/disabled [UiState] bindings and Inspector animation/feedback targets.
 extends SpinBox
 class_name UiReactSpinBox
 
 const _UiReactExitTeardown := preload("res://addons/ui_react/scripts/internal/react/ui_react_control_exit_teardown.gd")
-
-var _bind := UiReactTwoWayBindingDriver.new()
-var _local_signal_scope: UiReactSubscriptionScope
-var _value_state: UiState
-var _disabled_state: UiBoolState
 
 ## Two-way binding for numeric value ([float]). **Assign** for reactive sync with [UiFloatState].
 @export var value_state: UiState:
@@ -43,7 +39,12 @@ var _disabled_state: UiBoolState
 ## **Optional** — Feedback ([code]docs/FEEDBACK_LAYER.md[/code]): [method Input.start_joy_vibration] on triggers.
 @export var haptic_targets: Array[UiReactHapticFeedbackTarget] = []
 
+var _bind := UiReactTwoWayBindingDriver.new()
+var _local_signal_scope: UiReactSubscriptionScope
+var _value_state: UiState
+var _disabled_state: UiBoolState
 var _last_value: float = 0.0
+
 
 func _ready() -> void:
 	if _local_signal_scope != null:
@@ -102,7 +103,6 @@ func _validate_animation_targets() -> void:
 	var trigger_map: Dictionary = UiReactAnimTargetHelper.apply_validated_targets(self, "UiReactSpinBox")
 	UiReactFeedbackTargetHelper.apply_validated_audio_and_haptic_and_merge_triggers(self, "UiReactSpinBox", trigger_map)
 
-	# Connect signals based on which triggers are used (merged trigger_map includes feedback-only rows).
 	if trigger_map.has(UiAnimTarget.Trigger.HOVER_ENTER):
 		_local_signal_scope.connect_bound(mouse_entered, _on_trigger_hover_enter)
 	if trigger_map.has(UiAnimTarget.Trigger.HOVER_EXIT):
@@ -122,7 +122,6 @@ func _finish_initialization() -> void:
 
 ## Handles VALUE_CHANGED, VALUE_INCREASED, and VALUE_DECREASED trigger animations.
 func _on_trigger_value_changed(new_value: float) -> void:
-	# Skip animations during initialization
 	if _bind.initializing:
 		_last_value = new_value
 		return
@@ -166,7 +165,6 @@ func _trigger_animations(trigger_type: UiAnimTarget.Trigger) -> void:
 
 
 func _on_value_changed(new_value: float) -> void:
-	# Trigger animations if configured
 	if animation_targets.size() > 0 or audio_targets.size() > 0 or haptic_targets.size() > 0:
 		_on_trigger_value_changed(new_value)
 

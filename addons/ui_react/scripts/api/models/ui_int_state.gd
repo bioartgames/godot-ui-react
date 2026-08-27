@@ -20,10 +20,12 @@ func _init(initial_value: Variant = 0) -> void:
 			push_warning("UiIntState: unsupported initial type %s; use int" % type_string(typeof(initial_value)))
 
 
+## Returns [member value] as [Variant] for [UiState] bindings.
 func get_value() -> Variant:
 	return value
 
 
+## Coerces [param new_value] to [int] (or [code]0[/code] for [code]null[/code]), updates [member value], and emits [signal value_changed] when it changes.
 func set_value(new_value: Variant) -> void:
 	var v: int
 	if new_value == null:
@@ -45,6 +47,7 @@ func set_value(new_value: Variant) -> void:
 	emit_changed()
 
 
+## Coerces [param new_value] to [int] and updates [member value] without emitting [signal value_changed].
 func set_silent(new_value: Variant) -> void:
 	if new_value == null:
 		value = 0
@@ -60,9 +63,11 @@ func set_silent(new_value: Variant) -> void:
 	push_warning("UiIntState.set_silent: expected int, got %s" % type_string(typeof(new_value)))
 
 
+## Returns [member value] as [int].
 func get_int_value() -> int:
 	return value
 
 
+## Sets [member value] via [method set_value].
 func set_int_value(v: int) -> void:
 	set_value(v)

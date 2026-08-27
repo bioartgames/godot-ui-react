@@ -1,4 +1,4 @@
-## Concrete [UiReactWireRule] script list for Add menus (**[code]CB-035[/code]**, **[code]CB-058[/code]** follow-on). Single source — keep aligned with [code]docs/WIRING_LAYER.md[/code] §6.
+## Concrete [UiReactWireRule] script list for Add menus. Single source — keep aligned with [code]docs/WIRING_LAYER.md[/code] §6.
 class_name UiReactWireRuleCatalog
 extends RefCounted
 

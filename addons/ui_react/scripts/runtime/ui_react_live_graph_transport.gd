@@ -1,4 +1,4 @@
-## Runtime (**CB-018** live graph pulses): forwards wire/computed/action taps to [EngineDebugger]
+## Runtime live graph pulses: forwards wire/computed/action taps to [EngineDebugger]
 ## **`graph_live_pulses`** ([member UiReactDockConfig.KEY_RUNTIME_GRAPH_LIVE_PULSES_ENABLED]): synced from **Graph** tab **Play in editor** via **`UiReactDockConfig.sync_runtime_keys_from_editor_play_mode`** — runtime reads this bool only.
 ## **`EngineDebugger.is_active()`**, and **`OS.is_debug_build()`**. Editor consumes via [EditorDebuggerPlugin].
 extends RefCounted

@@ -1,4 +1,4 @@
-## Undo-safe [member Control.wire_rules] edits for Dependency Graph (**[code]CB-058[/code]** follow-on): rebind, disconnect, [rule_id], [enabled], [trigger], greenfield append.
+## Undo-safe [member Control.wire_rules] edits for Dependency Graph: rebind, disconnect, [rule_id], [enabled], [trigger], greenfield append.
 class_name UiReactWireGraphEditService
 extends RefCounted
 
@@ -162,7 +162,7 @@ const _SHALLOW_FIELD_KIND_BOOL := &"bool"
 const _SHALLOW_FIELD_APPLY_EXPLICIT := &"explicit"
 const _SHALLOW_FIELD_APPLY_IMMEDIATE := &"immediate"
 
-## Descriptor map for in-tab wire payload edits (CB-058 Milestone 2). Complex/nested fields stay Inspector-only.
+## Descriptor map for in-tab wire payload shallow edits. Complex/nested fields stay Inspector-only.
 const _SHALLOW_FIELD_DESCRIPTORS_BY_CLASS: Dictionary = {
 	&"UiReactWireCopySelectionDetail": [
 		{
@@ -284,7 +284,7 @@ static func _find_shallow_field_descriptor(
 	return {}
 
 
-## Undo-safe assign of descriptor-allowlisted shallow field on a duplicated wire rule (CB-058 Milestone 2).
+## Undo-safe assign of descriptor-allowlisted shallow field on a duplicated wire rule.
 static func try_commit_wire_rule_shallow_field(
 	host: Control,
 	rule_index: int,

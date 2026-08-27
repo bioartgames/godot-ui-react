@@ -1,3 +1,4 @@
+## Shared validation, trigger dispatch, and runtime storage for [UiAnimTarget] rows on reactive controls.
 class_name UiReactAnimTargetHelper
 extends RefCounted
 
@@ -10,12 +11,6 @@ enum AnimDispatchMode {
 	## Ignore triggers; run listed targets with disabled gating only (legacy helpers; list row play uses [method collect_animation_targets_for_row_slot] + [method UiAnimTarget.apply_with_preamble]).
 	MANUAL,
 }
-
-## Result of [method validate_and_map_triggers] (typed container; avoids stringly dictionary keys).
-class AnimTargetValidationResult:
-	extends RefCounted
-	var animation_targets: Array[UiAnimTarget] = []
-	var trigger_map: Dictionary = {}
 
 static func validate_animation_targets(owner: Control, component_name: String, animation_targets: Array[UiAnimTarget], allow_empty_for: Array[int] = []) -> Array[UiAnimTarget]:
 	var valid_targets: Array[UiAnimTarget] = []
@@ -225,3 +220,10 @@ static func trigger_animations(owner: Node, animation_targets: Array[UiAnimTarge
 		respects_disabled,
 		is_disabled,
 	)
+
+
+## Result of [method validate_and_map_triggers] (typed container; avoids stringly dictionary keys).
+class AnimTargetValidationResult:
+	extends RefCounted
+	var animation_targets: Array[UiAnimTarget] = []
+	var trigger_map: Dictionary = {}

@@ -19,6 +19,7 @@ enum TriggerKind { TEXT_CHANGED = 5, SELECTION_CHANGED = 6, TEXT_ENTERED = 13 }
 @export var trigger: TriggerKind = TriggerKind.SELECTION_CHANGED
 
 
+## Called when the bound source widget fires per [member trigger]; subclasses update state or run side effects.
+## Default is no-op; pulse-driven rules may use alternate entry points instead.
 func apply(_source: Node) -> void:
-	## Abstract: concrete rules implement [method apply] or pulse-driven entry points.
 	pass

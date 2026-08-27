@@ -9,15 +9,6 @@ static var _unified_original_snapshots: Dictionary = {}
 ## Tracks active animation count per target control.
 static var _active_animation_count: Dictionary = {}
 
-## Snapshot of a control's state for restoration.
-class ControlStateSnapshot:
-	var position: Vector2
-	var scale: Vector2
-	var modulate: Color
-	var rotation_degrees: float
-	var pivot_offset: Vector2
-	var visible: bool
-
 ## Acquires the unified baseline snapshot for a target control.
 static func acquire_unified_snapshot(source_node: Node, target: Control) -> ControlStateSnapshot:
 	if not target:
@@ -110,3 +101,13 @@ static func restore_control_state(target: Control, snapshot: ControlStateSnapsho
 	target.rotation_degrees = snapshot.rotation_degrees
 	target.pivot_offset = snapshot.pivot_offset
 	target.visible = snapshot.visible
+
+
+## Snapshot of a control's state for restoration.
+class ControlStateSnapshot:
+	var position: Vector2
+	var scale: Vector2
+	var modulate: Color
+	var rotation_degrees: float
+	var pivot_offset: Vector2
+	var visible: bool

@@ -1,11 +1,8 @@
+## Display-only reactive [RichTextLabel] with BBCode [UiState] text binding and optional Inspector animation/feedback targets.
 extends RichTextLabel
 class_name UiReactRichTextLabel
 
 const _UiReactExitTeardown := preload("res://addons/ui_react/scripts/internal/react/ui_react_control_exit_teardown.gd")
-
-var _bind := UiReactTwoWayBindingDriver.new()
-var _local_signal_scope: UiReactSubscriptionScope
-var _text_state: UiState
 
 ## Display-only BBCode binding ([String] or nested structures — see [method _as_text]). The wrapper sets [member bbcode_enabled] to [code]true[/code] in [method _ready]; do not rely on edit-back from the control.
 ## [member text_state] accepts [UiStringState], [UiComputedStringState], [UiArrayState], or [UiTransactionalState] whose committed/draft payload matches string or array via [member UiTransactionalState.matches_expected_binding_class]; [code]@export[/code] is typed [UiState] so transactional scenes stay valid ([code]docs/WIRING_LAYER.md[/code] §7.2).
@@ -30,7 +27,11 @@ var _text_state: UiState
 ## **Optional** — Feedback ([code]docs/FEEDBACK_LAYER.md[/code]): [method Input.start_joy_vibration] on triggers.
 @export var haptic_targets: Array[UiReactHapticFeedbackTarget] = []
 
+var _bind := UiReactTwoWayBindingDriver.new()
+var _local_signal_scope: UiReactSubscriptionScope
+var _text_state: UiState
 var _nested_states: Array[UiState] = []
+
 
 func _ready() -> void:
 	bbcode_enabled = true

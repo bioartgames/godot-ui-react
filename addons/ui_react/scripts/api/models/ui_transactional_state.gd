@@ -29,10 +29,12 @@ func begin_edit() -> void:
 		value_changed.emit(_draft_value, old_draft)
 
 
+## Returns the current draft payload (see class docs).
 func get_value() -> Variant:
 	return _draft_value
 
 
+## Updates the draft and emits [signal value_changed] when it changes.
 func set_value(new_value: Variant) -> void:
 	if _variants_equal(_draft_value, new_value):
 		return
@@ -43,6 +45,7 @@ func set_value(new_value: Variant) -> void:
 	emit_changed()
 
 
+## Updates the draft without emitting [signal value_changed].
 func set_silent(new_value: Variant) -> void:
 	_draft_value = _clone_variant(new_value)
 	emit_changed()
@@ -72,14 +75,17 @@ func cancel_draft() -> void:
 	emit_changed()
 
 
+## Returns [member committed_value] (last applied payload).
 func get_committed_value() -> Variant:
 	return committed_value
 
 
+## Returns the in-progress draft (same as [method get_value]).
 func get_draft_value() -> Variant:
 	return _draft_value
 
 
+## [code]true[/code] when draft and committed payloads differ.
 func has_pending_changes() -> bool:
 	return not _variants_equal(_draft_value, committed_value)
 

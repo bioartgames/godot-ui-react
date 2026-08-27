@@ -1,12 +1,8 @@
+## Reactive [OptionButton] with optional two-way selection/disabled state bindings, wire rules, and Inspector animation/action/feedback targets.
 extends OptionButton
 class_name UiReactOptionButton
 
 const _UiReactExitTeardown := preload("res://addons/ui_react/scripts/internal/react/ui_react_control_exit_teardown.gd")
-
-var _bind := UiReactTwoWayBindingDriver.new()
-var _local_signal_scope: UiReactSubscriptionScope
-var _selected_state: UiStringState
-var _disabled_state: UiBoolState
 
 ## Two-way binding for the selected item (typically [String] item text). **Assign** for reactive sync.
 @export var selected_state: UiStringState:
@@ -49,6 +45,11 @@ var _disabled_state: UiBoolState
 ## **Optional** — Wiring rules ([code]docs/WIRING_LAYER.md[/code] §5). Applied by [UiReactWireRuleHelper] via [UiReactHostWireTree].
 @export var wire_rules: Array[UiReactWireRule] = []
 
+var _bind := UiReactTwoWayBindingDriver.new()
+var _local_signal_scope: UiReactSubscriptionScope
+var _selected_state: UiStringState
+var _disabled_state: UiBoolState
+
 
 func _enter_tree() -> void:
 	UiReactHostWireTree.on_enter(self)
@@ -70,15 +71,6 @@ func _disconnect_local_control_signals() -> void:
 		_local_signal_scope = null
 
 
-func _exit_tree() -> void:
-	_reactive_teardown()
-
-
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE:
-		_reactive_teardown()
-
-
 func _ready() -> void:
 	if _local_signal_scope != null:
 		_local_signal_scope.dispose()
@@ -88,6 +80,15 @@ func _ready() -> void:
 	_connect_all_states()
 	_validate_animation_targets()
 	UiReactStateBindingHelper.deferred_finish_initialization(self)
+
+
+func _exit_tree() -> void:
+	_reactive_teardown()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		_reactive_teardown()
 
 
 func _disconnect_all_states() -> void:
@@ -113,7 +114,6 @@ func _validate_animation_targets() -> void:
 		self, "UiReactOptionButton", trigger_map
 	)
 
-	# Connect signals based on which triggers are used
 	if trigger_map.has(UiAnimTarget.Trigger.SELECTION_CHANGED):
 		_local_signal_scope.connect_bound(item_selected, _on_trigger_selection_changed)
 	if trigger_map.has(UiAnimTarget.Trigger.HOVER_ENTER):
@@ -136,7 +136,6 @@ func _finish_initialization() -> void:
 
 ## Handles SELECTION_CHANGED trigger animations.
 func _on_trigger_selection_changed(_index: int) -> void:
-	# Skip animations during initialization
 	if _bind.initializing:
 		return
 

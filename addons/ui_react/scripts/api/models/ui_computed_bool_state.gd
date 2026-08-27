@@ -9,8 +9,10 @@ extends UiBoolState
 @export var sources: Array[UiState] = []
 
 
+## Refreshes [member value] from [method compute_bool] and propagates updates like [method set_value].
 func recompute() -> void:
 	set_value(compute_bool())
 
 
+## Subclasses implement the derived boolean from [member sources].
 @abstract func compute_bool() -> bool

@@ -1,4 +1,4 @@
-## Deterministic focus-centric layout + orthogonal routing for Dependency Graph visual mode ([code]CB-018A[/code], [code]CB-018A.2[/code]).
+## Deterministic focus-centric layout + orthogonal routing for Dependency Graph visual mode.
 class_name UiReactExplainGraphLayout
 extends RefCounted
 

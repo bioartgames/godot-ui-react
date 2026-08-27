@@ -1,3 +1,4 @@
+## Editor dock for Ui React diagnostics, live dependency graph, and scene wiring inspection.
 @tool
 extends Control
 class_name UiReactDock
@@ -68,7 +69,7 @@ var _btn_ignore_all: Button
 var _replace_confirm_dialog: ConfirmationDialog
 
 var _tabs: TabContainer
-## [UiReactDockWiringPanel] — **Graph** tab: dependency graph + wire rules workbench (**CB-058** tab merge).
+## [UiReactDockWiringPanel] — **Graph** tab: dependency graph + wire rules workbench (merged tab).
 var _wiring_panel: Variant = null
 ## Tracks previous tab for persist-on-leave-Graph; aligned with [member TabContainer.current_tab] after loads.
 var _last_tab_for_persist: int = TAB_DIAGNOSTICS

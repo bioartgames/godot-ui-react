@@ -16,7 +16,7 @@ static func animate_fade_in(source_node: Node, target: Control, speed := UiAnimC
 		if not tween:
 			return Signal()
 		
-		tween.tween_property(target, 'modulate:a', UiAnimConstants.ALPHA_MAX, speed).set_trans(Tween.TRANS_CUBIC).set_ease(easing)
+		tween.tween_property(target, "modulate:a", UiAnimConstants.ALPHA_MAX, speed).set_trans(Tween.TRANS_CUBIC).set_ease(easing)
 		
 		return tween.finished
 	
@@ -24,6 +24,7 @@ static func animate_fade_in(source_node: Node, target: Control, speed := UiAnimC
 		return UiAnimLoopRunner.loop_animation(source_node, target, animation_callable, repeat_count)
 	else:
 		return animation_callable.call()
+
 
 ## Animates a control fading out (modulate.a from 1.0 to 0.0).
 ## [param source_node]: The node to create the tween from (usually self).
@@ -45,7 +46,7 @@ static func animate_fade_out(source_node: Node, target: Control, speed := UiAnim
 		if not tween:
 			return Signal()
 		
-		tween.tween_property(target, 'modulate:a', UiAnimConstants.ALPHA_MIN, speed).set_trans(Tween.TRANS_CUBIC).set_ease(easing)
+		tween.tween_property(target, "modulate:a", UiAnimConstants.ALPHA_MIN, speed).set_trans(Tween.TRANS_CUBIC).set_ease(easing)
 		
 		if auto_visible:
 			tween.finished.connect(func(): target.visible = false)
@@ -59,6 +60,7 @@ static func animate_fade_out(source_node: Node, target: Control, speed := UiAnim
 		return UiAnimLoopRunner.loop_animation(source_node, target, animation_callable, repeat_count)
 	else:
 		return animation_callable.call()
+
 
 static func animate_glow_pulse(source_node: Node, target: Control, duration: float = UiAnimConstants.DEFAULT_GLOW_PULSE_DURATION, repeat_count: int = -1, easing: int = Tween.EASE_OUT, glow_min_alpha: float = UiAnimConstants.DEFAULT_GLOW_MIN_ALPHA, auto_visible: bool = false) -> Signal:
 	if not UiAnimTweenFactory.guard_anim_pair(source_node, target, "animate_glow_pulse"):
@@ -75,14 +77,14 @@ static func animate_glow_pulse(source_node: Node, target: Control, duration: flo
 			push_warning("UiAnimUtils: Failed to create tween")
 			return Signal()
 		
-		# Fade to min
-		tween.tween_property(target, 'modulate:a', glow_min_alpha, duration * 0.5).set_trans(Tween.TRANS_SINE).set_ease(easing)
-		# Fade back to original
-		tween.tween_property(target, 'modulate:a', original_alpha, duration * 0.5).set_trans(Tween.TRANS_SINE).set_ease(easing)
+		tween.tween_property(target, "modulate:a", glow_min_alpha, duration * 0.5).set_trans(Tween.TRANS_SINE).set_ease(easing)
+		tween.tween_property(target, "modulate:a", original_alpha, duration * 0.5).set_trans(Tween.TRANS_SINE).set_ease(easing)
 		
 		return tween.finished
 	
 	return UiAnimLoopRunner.loop_animation(source_node, target, animation_callable, repeat_count)
+
+
 static func animate_color_flash(source_node: Node, target: Control, flash_color: Color = Color.YELLOW, duration: float = UiAnimConstants.DEFAULT_COLOR_FLASH_DURATION, flash_intensity: float = UiAnimConstants.DEFAULT_COLOR_FLASH_INTENSITY, auto_visible: bool = false, easing: int = Tween.EASE_OUT) -> Signal:
 	if not UiAnimTweenFactory.guard_anim_pair(source_node, target, "animate_color_flash"):
 		return Signal()
@@ -91,7 +93,7 @@ static func animate_color_flash(source_node: Node, target: Control, flash_color:
 		target.visible = true
 
 	var track_baseline: bool = UiAnimBaselineApplyContext.is_enabled()
-	var snapshot = null
+	var snapshot: UiAnimSnapshotStore.ControlStateSnapshot = null
 	if track_baseline:
 		snapshot = UiAnimSnapshotStore.acquire_unified_snapshot(source_node, target)
 	var original_modulate: Color
@@ -120,10 +122,8 @@ static func animate_color_flash(source_node: Node, target: Control, flash_color:
 	if not tween:
 		return Signal()
 	
-	# Flash to color
-	tween.tween_property(target, 'modulate', flash_modulate, duration * 0.5).set_trans(Tween.TRANS_CUBIC).set_ease(easing)
-	# Flash back to original (using the stored original from snapshot)
-	tween.tween_property(target, 'modulate', original_modulate, duration * 0.5).set_trans(Tween.TRANS_CUBIC).set_ease(easing)
+	tween.tween_property(target, "modulate", flash_modulate, duration * 0.5).set_trans(Tween.TRANS_CUBIC).set_ease(easing)
+	tween.tween_property(target, "modulate", original_modulate, duration * 0.5).set_trans(Tween.TRANS_CUBIC).set_ease(easing)
 
 	if track_baseline:
 		tween.finished.connect(func():

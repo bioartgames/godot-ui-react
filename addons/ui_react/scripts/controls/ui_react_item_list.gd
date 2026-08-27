@@ -1,21 +1,11 @@
+## Reactive [ItemList] with optional items/selection [UiState] bindings, row-scoped animation presets, wire rules, and signature-based list rebuild.
 extends ItemList
 class_name UiReactItemList
 
 const _UiReactExitTeardown := preload("res://addons/ui_react/scripts/internal/react/ui_react_control_exit_teardown.gd")
 
 const _ICON_PATH_CACHE_MAX: int = 64
-
-var _bind := UiReactTwoWayBindingDriver.new()
-var _local_signal_scope: UiReactSubscriptionScope
-var _items_state: UiArrayState
-var _selected_state: UiState
-
-## `String` (normalized res path) -> [Texture2D]; FIFO-capped when paths rotate.
-var _icon_path_cache: Dictionary = {}
-var _icon_path_cache_order: Array[String] = []
-
-## Per-row stable signatures for cheap rebuild skip (see [method _entry_signature]).
-var _last_items_signatures: PackedStringArray = PackedStringArray()
+const _WARN_SINGLE_SELECT_EXPECT_INT := "UiReactItemList: expected int for single-select selected_state"
 
 ## **Optional** — list row contents from a [UiArrayState] (or assign an [Array] payload).
 ## Each element is either stringified with [method @GlobalScope.str], or a [Dictionary] with **label** or **text**, and optional **icon** ([Texture2D] or [code]res://[/code] path string).
@@ -62,9 +52,16 @@ var _last_items_signatures: PackedStringArray = PackedStringArray()
 ## **Optional** — Wiring rules ([code]docs/WIRING_LAYER.md[/code] §5). Applied by [UiReactWireRuleHelper] via [UiReactHostWireTree].
 @export var wire_rules: Array[UiReactWireRule] = []
 
+var _bind := UiReactTwoWayBindingDriver.new()
+var _local_signal_scope: UiReactSubscriptionScope
+var _items_state: UiArrayState
+var _selected_state: UiState
+## `String` (normalized res path) -> [Texture2D]; FIFO-capped when paths rotate.
+var _icon_path_cache: Dictionary = {}
+var _icon_path_cache_order: Array[String] = []
+## Per-row stable signatures for cheap rebuild skip (see [method _entry_signature]).
+var _last_items_signatures: PackedStringArray = PackedStringArray()
 var _row_play_in_progress: bool = false
-
-const _WARN_SINGLE_SELECT_EXPECT_INT := "UiReactItemList: expected int for single-select selected_state"
 
 
 func _enter_tree() -> void:
@@ -87,15 +84,6 @@ func _disconnect_local_control_signals() -> void:
 		_local_signal_scope = null
 
 
-func _exit_tree() -> void:
-	_reactive_teardown()
-
-
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE:
-		_reactive_teardown()
-
-
 func _ready() -> void:
 	if _local_signal_scope != null:
 		_local_signal_scope.dispose()
@@ -106,6 +94,15 @@ func _ready() -> void:
 	_connect_all_states()
 	_validate_animation_targets()
 	UiReactStateBindingHelper.deferred_finish_initialization(self)
+
+
+func _exit_tree() -> void:
+	_reactive_teardown()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		_reactive_teardown()
 
 
 func _disconnect_all_states() -> void:
@@ -132,7 +129,6 @@ func _validate_animation_targets() -> void:
 		self, "UiReactItemList", trigger_map
 	)
 
-	# Connect signals based on which triggers are used
 	if trigger_map.has(UiAnimTarget.Trigger.SELECTION_CHANGED):
 		_local_signal_scope.connect_bound(item_selected, _on_trigger_selection_changed)
 	if trigger_map.has(UiAnimTarget.Trigger.HOVER_ENTER):
@@ -234,7 +230,6 @@ func _finish_initialization() -> void:
 
 ## Handles SELECTION_CHANGED trigger animations.
 func _on_trigger_selection_changed(_index: int) -> void:
-	# Skip animations during initialization
 	if _bind.initializing:
 		return
 
@@ -469,7 +464,6 @@ func _on_item_selected(_index: int) -> void:
 
 
 func _on_item_activated(index: int) -> void:
-	# Also trigger selection changed on activation
 	_on_item_selected(index)
 
 

@@ -1,11 +1,8 @@
+## Reactive [ProgressBar] with optional two-way value [UiState] binding, completion triggers, and Inspector animation/feedback targets.
 extends ProgressBar
 class_name UiReactProgressBar
 
 const _UiReactExitTeardown := preload("res://addons/ui_react/scripts/internal/react/ui_react_control_exit_teardown.gd")
-
-var _bind := UiReactTwoWayBindingDriver.new()
-var _local_signal_scope: UiReactSubscriptionScope
-var _value_state: UiState
 
 ## Two-way binding for [member Range.value] ([float]). **Assign** for reactive sync.
 @export var value_state: UiState:
@@ -29,8 +26,12 @@ var _value_state: UiState
 ## **Optional** — Feedback ([code]docs/FEEDBACK_LAYER.md[/code]): [method Input.start_joy_vibration] on triggers.
 @export var haptic_targets: Array[UiReactHapticFeedbackTarget] = []
 
+var _bind := UiReactTwoWayBindingDriver.new()
+var _local_signal_scope: UiReactSubscriptionScope
+var _value_state: UiState
 var _last_value: float = 0.0
 var _was_completed: bool = false
+
 
 func _ready() -> void:
 	if _local_signal_scope != null:
@@ -93,7 +94,6 @@ func _validate_animation_targets() -> void:
 		self, "UiReactProgressBar", trigger_map
 	)
 
-	# Connect signals based on which triggers are used
 	if trigger_map.has(UiAnimTarget.Trigger.HOVER_ENTER):
 		_local_signal_scope.connect_bound(mouse_entered, _on_trigger_hover_enter)
 	if trigger_map.has(UiAnimTarget.Trigger.HOVER_EXIT):
@@ -113,7 +113,6 @@ func _finish_initialization() -> void:
 
 ## Handles VALUE_CHANGED, VALUE_INCREASED, VALUE_DECREASED, and COMPLETED trigger animations.
 func _on_trigger_value_changed(new_value: float) -> void:
-	# Skip animations during initialization
 	if _bind.initializing:
 		_last_value = new_value
 		# Update completion state but don't trigger animation
@@ -127,7 +126,6 @@ func _on_trigger_value_changed(new_value: float) -> void:
 	elif new_value < _last_value:
 		_trigger_animations(UiAnimTarget.Trigger.VALUE_DECREASED)
 
-	# Check for completion
 	var is_completed = _is_completed()
 	if is_completed and not _was_completed:
 		_trigger_animations(UiAnimTarget.Trigger.COMPLETED)
@@ -173,7 +171,6 @@ func _on_value_state_changed(new_value: Variant, _old_value: Variant) -> void:
 	_bind.updating = true
 	value = target_value
 
-	# Trigger animations if configured
 	if animation_targets.size() > 0 or audio_targets.size() > 0 or haptic_targets.size() > 0:
 		_on_trigger_value_changed(target_value)
 

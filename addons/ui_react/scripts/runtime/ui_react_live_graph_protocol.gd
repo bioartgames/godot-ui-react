@@ -1,4 +1,4 @@
-## Wire identifiers for **`EngineDebugger`** (`CB-018` live graph). Shared by **`UiReactLiveGraphTransport`** and **`EditorDebuggerPlugin`** ingest.
+## Wire identifiers for **`EngineDebugger`** live graph pulses. Shared by **`UiReactLiveGraphTransport`** and **`EditorDebuggerPlugin`** ingest.
 extends RefCounted
 class_name UiReactLiveGraphProtocol
 
