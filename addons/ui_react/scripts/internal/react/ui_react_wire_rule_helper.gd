@@ -1,6 +1,6 @@
 ## Binds [member wire_rules] on a single [UiReact*] host: signals, [Resource.changed], and optionally an initial [method UiReactWireRule.apply] when [member UiReactWireRule.run_apply_on_attach] is [code]true[/code].
 ## See [code]docs/WIRING_LAYER.md[/code].
-## Prefer [method schedule_attach] during [method Node._enter_tree] after [UiState] binding is wired in [method Node._ready], and detach during [method Node._exit_tree] **after** unbinding reactive [UiState] connections (typically [method UiReactControlStateWire.unbind_value_changed]), then call [method detach] so wiring rules never run against half-torn controls.
+## Prefer [method schedule_attach] during [method Node._enter_tree] after [UiState] binding is wired in [method Node._ready]. Detach on [constant NOTIFICATION_PREDELETE] **after** unbinding reactive [UiState] connections (typically [method UiReactControlStateWire.unbind_value_changed]), then call [method detach] so wiring rules never run against a freed host. Do not detach on [method Node._exit_tree] — that path is reparent.
 ## [method attach] preserves two-phase semantics: bind connections for **all** enabled rules first, then [method UiReactWireRule.apply] for rows with [member UiReactWireRule.run_apply_on_attach] in array index order.
 class_name UiReactWireRuleHelper
 extends RefCounted

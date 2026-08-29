@@ -56,10 +56,6 @@ func _disconnect_local_control_signals() -> void:
 		_local_signal_scope = null
 
 
-func _exit_tree() -> void:
-	_reactive_teardown()
-
-
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		_reactive_teardown()

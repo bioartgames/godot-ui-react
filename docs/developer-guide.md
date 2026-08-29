@@ -20,7 +20,7 @@ For product intent, examples, and the long-form control matrix, prefer `addons/u
 | Animation | `UiAnimTarget`, `UiAnimUtils` | Inspector or code tweens |
 | Transactional | `UiTransactionalGroup`, `UiReactTransactionalHostBinding`, `UiReactTransactionalSession` | Draft / Apply / Cancel |
 
-**Lifecycle (typical control):** `_enter_tree` may schedule wire attach → `_ready` connects control signals + `UiReactControlStateWire.bind_value_changed` → deferred `_finish_initialization` clears the two-way init guard → `_exit_tree` / `PREDELETE` teardown unbinds and detaches wires.
+**Lifecycle (typical control):** `_enter_tree` may schedule wire attach → `_ready` connects control signals + `UiReactControlStateWire.bind_value_changed` → deferred `_finish_initialization` clears the two-way init guard → **`NOTIFICATION_PREDELETE` teardown** unbinds and detaches wires. Reparent after `_ready` keeps bindings live (`_ready` does not run again; do not expect `_exit_tree` to mean “freed”).
 
 **Editor:** `addons/ui_react/editor_plugin/` — bottom dock **Diagnostics** + **Graph** (dependency snapshot, wire list, live debug ingest). Enabled via `plugin.cfg`; not an Autoload.
 
@@ -48,6 +48,7 @@ For product intent, examples, and the long-form control matrix, prefer `addons/u
 - Assume shared `.tres` Resources are safe to mutate as per-instance runtime state (Prototype vs Instance).
 - Mutate `UiArrayState` through a getter result — getters return copies; use setters so `value_changed` fires (ADR-0003).
 - Expect two runtime `UiReactTabContainer` hosts to share mutable `tab_config` instance state — cfg is localized per host at runtime (ADR-0004).
+- Tear down `UiReact*` bindings on `_exit_tree` — that path is reparent, not free. Teardown is PREDELETE-only (ADR-0006).
 
 ---
 

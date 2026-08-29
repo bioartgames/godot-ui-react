@@ -19,5 +19,6 @@ Do **not** paste ADR numbers into shipping `.gd` comments. Traceability: this fo
 | [ADR-0003](ADR-0003-proposal-state-payload-isolation.md) | Array / transactional payload isolation | **A1+A2** copy on get + deep clone | DEC-003 / BUG-008–009 |
 | [ADR-0004](ADR-0004-proposal-tab-config-instance-state.md) | `UiTabContainerCfg` vs instance tab runtime state | **B** duplicate cfg at runtime | DEC-004 / BUG-010 / ARCH-001 / PAT-001 |
 | [ADR-0005](ADR-0005-proposal-portable-addon-gut-contracts.md) | Contract GUT for portable addon public API | defaults accepted | DEC-005 / Wave B–C |
+| [ADR-0006](ADR-0006-reparent-survives-bindings.md) | Bindings survive reparent | Teardown on PREDELETE only | M-REPARENT |
 
 Proposals awaiting confirmation: *(none)*

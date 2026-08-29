@@ -481,3 +481,36 @@ CI-1 / CI-2 from governance kickoff still need explicit user approval before MDC
 
 - [Developer Guide](developer-guide.md)
 - [ADR index](adr/README.md)
+
+---
+
+## M-REPARENT: Bindings survive reparent (2026-08-29)
+
+**Significance:** Framework — public `UiReact*` lifecycle contract.
+
+### PLAN R-01 — `DONE` (complete)
+
+| Field | Content |
+|-------|---------|
+| **Objective** | After a `UiReact*` control `_ready`s, reparenting it must leave two-way `*_state` bindings live so setting the native control value updates the Resource. Teardown runs on `NOTIFICATION_PREDELETE` only, not `_exit_tree`. |
+| **Files in scope** | **Write:** every `addons/ui_react/scripts/controls/ui_react_*.gd` that calls `_reactive_teardown` / `on_exit_tree` from `_exit_tree`; `ui_react_base_button_reactive.gd` only if PREDELETE path needs a comment (no behavior fork); `ui_react_control_exit_teardown.gd` class doc; `ui_react_wire_rule_helper.gd` / `ui_react_action_target_helper.gd` docs; `docs/adr/ADR-0006-reparent-survives-bindings.md`; `docs/developer-guide.md` lifecycle sentence; `docs/adr/README.md`; `test/unit/test_ui_c03_controls.gd`. **Read:** `ui_react_subscription_scope.gd` (`dispose` latches — do not reuse a disposed scope). |
+| **Approach** | 1. Remove `_exit_tree` teardown from all listed controls (Button/TextureButton stop calling `on_exit_tree` there). 2. Keep `_notification(NOTIFICATION_PREDELETE)` teardown. 3. Do **not** rebind on `_enter_tree` unless teardown ran — if a future path rebinds, allocate a **new** `UiReactSubscriptionScope`. 4. Wire attach may still schedule on `_enter_tree` (`attach` detaches first). 5. GUT: add slider to tree, wait ready, reparent to a new parent, set `.value`, assert `value_state` updated. |
+| **Constraints** | Godot-Native First: `_exit_tree` on reparent is engine-correct; do not fight it with deferred teardown shims. No `game_shell` import. No ADR IDs in shipping comments. Do not change binding setter no-op-on-same-instance. |
+| **Acceptance gate** | `test_slider_value_state_updates_after_reparent` in `test_ui_c03_controls.gd`: reparent after `_ready`, assign `slider.value`, `value_state.get_value()` matches. Full `res://test/unit` green. |
+| **Out of scope** | Host hybrid panel; AudioDirector; forking controls only in a consumer repo. |
+
+### PREFLIGHT R-01 — `DONE` (go)
+
+| Check | Verdict |
+|-------|---------|
+| Predecessor completeness | M-AUDIT waves DONE |
+| File integrity | Control `_exit_tree` still teardowns as planned |
+| Rule file stability | No conflicting MDC amend |
+| Acceptance gate validity | Slider public observers `value` / `value_state.get_value()` still exist |
+| No new conflicting findings | RCA confirms `_exit_tree` teardown is the defect |
+
+**Verdict:** go.
+
+### IMPL R-01 — `DONE`
+
+Removed `_exit_tree` teardown from all `UiReact*` controls. PREDELETE teardown remains. GUT `res://test/unit` 61/61 including `test_slider_value_state_updates_after_reparent`.

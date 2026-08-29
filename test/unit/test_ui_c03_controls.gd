@@ -72,3 +72,28 @@ func test_button_pressed_state_pulses() -> void:
 	assert_eq(edges[0], true)
 	assert_eq(edges[1], false)
 	btn.queue_free()
+
+
+func test_slider_value_state_updates_after_reparent() -> void:
+	var holder := Control.new()
+	add_child_autofree(holder)
+	var dest := Control.new()
+	add_child_autofree(dest)
+
+	var slider := UiReactSlider.new()
+	slider.min_value = -40.0
+	slider.max_value = 6.0
+	slider.step = 0.5
+	var state := UiFloatState.new(0.0)
+	slider.value_state = state
+	holder.add_child(slider)
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+	holder.remove_child(slider)
+	dest.add_child(slider)
+	await get_tree().process_frame
+
+	slider.value = -12.0
+	await get_tree().process_frame
+	assert_almost_eq(float(state.get_value()), -12.0, 0.001)

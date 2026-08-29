@@ -1,6 +1,6 @@
 ## Runtime helpers for [member Control.action_targets] rows: validation, state-watch wiring, and trigger dispatch.
 ## Reentry guards use [UiReactReentryGuardByMeta] against [member _META_LOCKS].
-## Call [method teardown_for_control_exit] from [method Node._exit_tree] / [constant NOTIFICATION_PREDELETE] before unbinding [UiState] so [code]state_watch[/code] subscriptions drop first.
+## Call [method teardown_for_control_exit] from [constant NOTIFICATION_PREDELETE] before unbinding [UiState] so [code]state_watch[/code] subscriptions drop first. Do not call it from [method Node._exit_tree] (reparent).
 class_name UiReactActionTargetHelper
 extends RefCounted
 

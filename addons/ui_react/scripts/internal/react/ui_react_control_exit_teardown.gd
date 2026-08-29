@@ -1,6 +1,6 @@
 extends RefCounted
 
-## Mirrors [member Node.notification] [constant NOTIFICATION_PREDELETE] with [method Node._exit_tree] for reactive [UiReact*] controls.
+## Shared teardown callables for reactive [UiReact*] controls. Call from [constant NOTIFICATION_PREDELETE] only — not [method Node._exit_tree] (reparent).
 
 static func teardown_wire_host(disconnect_states: Callable, wire_exit: Callable) -> void:
 	disconnect_states.call()

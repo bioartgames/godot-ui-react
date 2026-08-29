@@ -89,10 +89,6 @@ func _ready() -> void:
 	UiReactStateBindingHelper.deferred_finish_initialization(self)
 
 
-func _exit_tree() -> void:
-	_reactive_teardown()
-
-
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		_reactive_teardown()
